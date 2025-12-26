@@ -93,6 +93,12 @@ class WebHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/upload":
             self._handle_upload()
+        elif self.path == "/api/reload-config":
+            result = self.manager.reload_config()
+            self.send_response(200 if result["success"] else 400)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
         elif self.path.startswith("/api/update/"):
             parts = self.path.split("/")
             if len(parts) >= 4:

@@ -157,6 +157,9 @@ def get_html(title: str = "Process Manager") -> str:
         .btn-update { background: linear-gradient(135deg, #ff9800, #f57c00); color: white; }
         .btn-upload-header { background: linear-gradient(135deg, #00bcd4, #0097a7); color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 600; transition: all 0.2s ease; }
         .btn-upload-header:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 188, 212, 0.4); }
+        .btn-reload-config { background: linear-gradient(135deg, #ff9800, #f57c00); color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 600; transition: all 0.2s ease; }
+        .btn-reload-config:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4); }
+        .btn-reload-config:disabled { background: #444; cursor: not-allowed; transform: none; box-shadow: none; }
 
         /* Footer */
         .footer {
@@ -265,6 +268,7 @@ def get_html(title: str = "Process Manager") -> str:
                 <span class="header-subtitle">{{TITLE}}</span>
             </div>
             <div style="display: flex; gap: 15px; align-items: center;">
+                <button class="btn btn-reload-config" onclick="reloadConfig()" id="btnReloadConfig">Reload Configuration</button>
                 <button class="btn btn-upload-header" onclick="openUploadModal()">+ Upload Program</button>
                 <div class="header-status" id="headerStatus">
                     <span class="dot"></span>
@@ -662,6 +666,32 @@ def get_html(title: str = "Process Manager") -> str:
                 }
             } catch (error) {
                 alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function reloadConfig() {
+            const btn = document.getElementById('btnReloadConfig');
+            btn.disabled = true;
+            btn.textContent = 'Reloading...';
+
+            try {
+                const response = await fetch('/api/reload-config', {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message);
+                    fetchStatus();
+                } else {
+                    alert(`Failed to reload configuration: ${result.message}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Reload Configuration';
             }
         }
 

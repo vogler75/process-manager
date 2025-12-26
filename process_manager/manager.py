@@ -45,6 +45,7 @@ class ProcessManager:
         self.uploaded_config_path = self.base_dir / "uploaded_programs.yaml"
         self.pid_file = self.base_dir / "process_manager.pids.json"
         self.uploaded_dir = self.base_dir / UPLOADED_PROGRAMS_DIR
+        self.log_dir = self.base_dir / "log"
         self.processes: dict[str, ProcessInfo] = {}
         self.running = True
         self.lock = threading.Lock()
@@ -55,9 +56,23 @@ class ProcessManager:
 
         # Create uploaded programs directory if it doesn't exist
         self.uploaded_dir.mkdir(exist_ok=True)
+        # Create log directory if it doesn't exist
+        self.log_dir.mkdir(exist_ok=True)
 
         self.load_config()
         self.restore_processes()
+
+    def reload_config(self) -> dict:
+        """Reload configuration from disk without restarting processes.
+        Returns: {"success": bool, "message": str}
+        """
+        with self.lock:
+            try:
+                # Re-load the configuration
+                self.load_config()
+                return {"success": True, "message": "Configuration reloaded successfully"}
+            except Exception as e:
+                return {"success": False, "message": f"Failed to reload configuration: {str(e)}"}
 
     def load_config(self):
         # Load main configuration
@@ -334,7 +349,7 @@ class ProcessManager:
         This copies the log to .log.1 and truncates the original file.
         The subprocess keeps writing to the same fd, now at position 0.
         """
-        log_file = self.base_dir / f"{self.sanitize_filename(info.name)}.log"
+        log_file = self.log_dir / f"{self.sanitize_filename(info.name)}.log"
         if not log_file.exists():
             return
 
@@ -346,7 +361,7 @@ class ProcessManager:
                 return
 
             # Rotate: copy to .log.1 then truncate original
-            backup_file = self.base_dir / f"{self.sanitize_filename(info.name)}.log.1"
+            backup_file = self.log_dir / f"{self.sanitize_filename(info.name)}.log.1"
 
             # Copy current log to backup (overwrites existing backup)
             shutil.copy2(log_file, backup_file)
@@ -385,11 +400,11 @@ class ProcessManager:
             info.status = "error"
             return
 
-        log_file = self.base_dir / f"{self.sanitize_filename(info.name)}.log"
+        log_file = self.log_dir / f"{self.sanitize_filename(info.name)}.log"
         venv_python = self.get_venv_python(info)
 
         # Build command with optional arguments
-        cmd = [str(venv_python), str(script_path)]
+        cmd = [str(venv_python), "-u", str(script_path)]
         if info.args:
             cmd.extend([str(arg) for arg in info.args])
 
@@ -505,7 +520,7 @@ class ProcessManager:
                     uptime = str(datetime.now() - info.start_time).split(".")[0]
 
                 # Get log file size
-                log_file = self.base_dir / f"{self.sanitize_filename(info.name)}.log"
+                log_file = self.log_dir / f"{self.sanitize_filename(info.name)}.log"
                 log_size = None
                 log_size_display = None
                 if log_file.exists():
@@ -651,7 +666,7 @@ class ProcessManager:
         if name not in self.processes:
             return {"error": "Process not found", "content": None}
 
-        log_file = self.base_dir / f"{self.sanitize_filename(name)}.log"
+        log_file = self.log_dir / f"{self.sanitize_filename(name)}.log"
         if not log_file.exists():
             return {"error": "Log file not found", "content": None, "total_lines": 0}
 
@@ -738,7 +753,7 @@ class ProcessManager:
 
     def _install_program_async(self, name: str, program_dir: Path, should_start: bool):
         """Install program (venv + dependencies) in background thread."""
-        log_file = self.base_dir / f"{self.sanitize_filename(name)}.log"
+        log_file = self.log_dir / f"{self.sanitize_filename(name)}.log"
 
         try:
             # Write initial log message
@@ -890,7 +905,7 @@ class ProcessManager:
 
     def _update_program_async(self, name: str, program_dir: Path, backup_dir: Path):
         """Update program dependencies in background thread."""
-        log_file = self.base_dir / f"{self.sanitize_filename(name)}.log"
+        log_file = self.log_dir / f"{self.sanitize_filename(name)}.log"
 
         try:
             # Write initial log message
