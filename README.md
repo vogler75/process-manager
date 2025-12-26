@@ -41,6 +41,7 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```bash
 pip install -r requirements.txt
 ```
+   *Note: If you encounter `ModuleNotFoundError: No module named 'psutil'` or issues during `psutil` installation, ensure you have the necessary build tools for your operating system (e.g., `python3-dev` and `gcc` on Linux, Xcode command line tools on macOS, or Visual C++ Build Tools on Windows). `psutil` is required for CPU monitoring features.*
 
 ## Configuration
 
@@ -347,7 +348,7 @@ The manager uses PID files to reconnect. If a process was killed externally:
 ## Dependencies
 
 - **pyyaml** - YAML configuration parsing
-- **psutil** - CPU monitoring (optional, degrades gracefully if missing)
+- **psutil** - CPU monitoring (required for CPU monitoring)
 
 Standard library only for core functionality!
 
