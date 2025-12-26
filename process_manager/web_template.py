@@ -143,7 +143,9 @@ def get_html(title: str = "Process Manager") -> str:
             font-size: 0.85em;
             font-weight: 500;
             transition: all 0.2s ease;
+            min-width: 80px;
         }
+        .btn-placeholder { visibility: hidden; pointer-events: none; }
         .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
         .btn:active { transform: translateY(0); }
         .btn:disabled { background: #444; cursor: not-allowed; opacity: 0.5; transform: none; box-shadow: none; }
@@ -393,9 +395,12 @@ def get_html(title: str = "Process Manager") -> str:
                         <button class="btn btn-restart" onclick="action('restart', '${p.name}')" ${p.status === 'stopping' || p.status === 'restarting' ? 'disabled' : ''}>Restart</button>
                         <button class="btn btn-logs" onclick="openLogModal('${p.name}')">Logs</button>
                         ${p.uploaded ? `
-                            ${p.status === 'stopped' ? `<button class="btn btn-update" onclick="openUpdateModal('${p.name}')">Update</button>` : ''}
-                            ${p.status === 'stopped' ? `<button class="btn btn-remove" onclick="removeProgram('${p.name}')">Remove</button>` : ''}
-                        ` : ''}
+                            ${p.status === 'stopped' ? `<button class="btn btn-update" onclick="openUpdateModal('${p.name}')">Update</button>` : `<button class="btn btn-update btn-placeholder">Update</button>`}
+                            ${p.status === 'stopped' ? `<button class="btn btn-remove" onclick="removeProgram('${p.name}')">Remove</button>` : `<button class="btn btn-remove btn-placeholder">Remove</button>`}
+                        ` : `
+                            <button class="btn btn-update btn-placeholder">Update</button>
+                            <button class="btn btn-remove btn-placeholder">Remove</button>
+                        `}
                     </div>
                 </div>
             `).join('');
