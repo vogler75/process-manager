@@ -5,6 +5,8 @@ A lightweight, self-contained process manager for Python applications with a bea
 ## Features
 
 - **Web-based Dashboard** - Modern, responsive UI with real-time status updates
+- **Program Upload** - Upload Python programs as ZIP files directly from the web UI
+- **Background Installation** - Automatic venv creation and dependency installation with live logs
 - **Process Monitoring** - Automatic restart on failures with configurable retry limits
 - **CPU Monitoring** - Real-time CPU usage tracking with sparkline charts (requires psutil)
 - **Log Management** - Automatic log rotation with built-in log viewer
@@ -127,11 +129,11 @@ programs:
 ### Starting the Manager
 
 ```bash
-python3 process_manager.py
+python3 -m process_manager
 ```
 
 The manager will:
-1. Load configuration from `process_manager.yaml`
+1. Load configuration from `process_manager.yaml` and `uploaded_programs.yaml`
 2. Restore any previously running processes
 3. Start all enabled programs
 4. Launch the web UI
@@ -168,8 +170,10 @@ On next startup, the manager will reconnect to running processes.
 
 - **Running** (Green) - Process is active and healthy
 - **Stopped** (Red) - Process is not running
+- **Installing** (Purple) - Program is being installed (venv creation + pip install)
 - **Restarting** (Blue) - Automatic restart in progress
 - **Stopping** (Orange) - Shutdown in progress
+- **Error** (Orange) - Installation or runtime error occurred
 - **Broken** (Red) - Too many consecutive failures, auto-restart disabled
 
 ### Log Viewer
@@ -178,6 +182,156 @@ On next startup, the manager will reconnect to running processes.
 - **Auto-refresh** - Toggle live tail mode
 - **File Info** - Shows line ranges and total size
 - **Keyboard Shortcuts** - Press `Esc` to close modal
+
+## Uploading Programs
+
+### Upload via Web UI
+
+Click the **"+ Upload Program"** button in the top right to upload a new Python program:
+
+1. **Name** - Display name for the program
+2. **Script** - Main Python file to run (e.g., `main.py`, `app.py`)
+3. **ZIP File** - Select a ZIP file containing your program files
+4. **Arguments** - Optional command-line arguments (comma-separated)
+5. **Start automatically** - Check to auto-start after installation
+
+Click **"Upload Program"** and the manager will:
+- Extract the ZIP file to `uploaded_programs/{Program_Name}/`
+- Create a dedicated virtual environment at `.venv/`
+- Install dependencies from `requirements.txt` (if present)
+- Show real-time installation logs
+- Auto-start the program (if enabled)
+
+### ZIP File Structure
+
+Your ZIP can be structured in two ways:
+
+**Option 1: Files directly in ZIP root**
+```
+program.zip
+├── main.py
+├── requirements.txt
+├── config.yaml
+└── utils.py
+```
+
+**Option 2: Single top-level folder (auto-flattened)**
+```
+program.zip
+└── my_program/
+    ├── main.py
+    ├── requirements.txt
+    └── utils.py
+```
+
+Both structures work - the manager automatically flattens single-folder ZIPs.
+
+### Background Installation
+
+After upload, programs install in the background:
+- Status shows **"installing"** (purple badge)
+- Click **"Logs"** to watch real-time installation progress
+- Venv creation and pip install output streams to the log
+- Status automatically changes to **"running"** or **"stopped"** when done
+
+Example installation log:
+```
+==================================================================
+Program Upload: My App
+Time: 2025-12-26 16:45:23
+Directory: /path/to/uploaded_programs/My_App
+==================================================================
+
+============================================================
+Creating virtual environment...
+Command: /usr/bin/python3 -m venv /path/to/.venv
+============================================================
+
+[SUCCESS] Virtual environment created successfully
+
+============================================================
+Installing dependencies from requirements.txt...
+Command: /path/to/.venv/bin/python -m pip install -r requirements.txt
+============================================================
+
+Collecting requests==2.31.0
+  Downloading requests-2.31.0-py3-none-any.whl (62 kB)
+Installing collected packages: requests
+Successfully installed requests-2.31.0
+
+[SUCCESS] Dependencies installed successfully
+==================================================================
+[SUCCESS] Installation completed successfully!
+==================================================================
+```
+
+### Managing Uploaded Programs
+
+Uploaded programs have additional controls:
+
+- **Update** - Upload a new ZIP to replace the program (only when stopped)
+- **Remove** - Delete the program and its files (only when stopped)
+
+**Update Process:**
+1. Stop the program
+2. Click **"Update"** button
+3. Upload new ZIP file
+4. Files are replaced and dependencies reinstalled
+5. Start the program when ready
+
+**Remove Process:**
+1. Stop the program
+2. Click **"Remove"** button
+3. Confirm deletion
+4. Program and directory are deleted
+
+### Size Limits and Restrictions
+
+- **Maximum ZIP size**: 50 MB
+- **Security**: Path traversal attacks are prevented (no `..` or `/` in paths)
+- **Name conflicts**: Cannot upload if name already exists (use Update instead)
+- **Modification**: Only uploaded programs can be updated/removed (manual config entries are protected)
+
+### Creating a Test Program
+
+To create a simple test program for upload:
+
+1. Create a directory with your program files:
+```bash
+mkdir my_test_app
+cd my_test_app
+```
+
+2. Create `main.py`:
+```python
+import time
+from datetime import datetime
+
+while True:
+    print(f"[{datetime.now()}] Test app is running...")
+    time.sleep(10)
+```
+
+3. Create `requirements.txt` (optional):
+```
+requests==2.31.0
+```
+
+4. Create the ZIP file:
+```bash
+# Option 1: Zip the contents (recommended)
+zip -r ../my_test_app.zip .
+
+# Option 2: Zip the folder (also works - auto-flattened)
+cd ..
+zip -r my_test_app.zip my_test_app/
+```
+
+5. Upload via web UI:
+   - Name: "Test App"
+   - Script: "main.py"
+   - ZIP: Select `my_test_app.zip`
+   - Check "Start automatically"
 
 ## Process Management
 
@@ -204,13 +358,34 @@ Process IDs are saved to `process_manager.pids.json`. When the manager restarts:
 
 ```
 .
-├── process_manager.py          # Main application
-├── process_manager.yaml        # Configuration file
+├── process_manager/            # Main application package
+│   ├── __init__.py
+│   ├── __main__.py
+│   ├── models.py
+│   ├── manager.py
+│   ├── web_handler.py
+│   └── web_template.py
+├── process_manager.yaml        # Configuration for manual programs
+├── uploaded_programs.yaml      # Configuration for uploaded programs (auto-generated)
 ├── requirements.txt            # Python dependencies
 ├── process_manager.pids.json   # Saved process states (auto-generated)
+├── uploaded_programs/          # Uploaded program files (auto-generated)
+│   └── {Program_Name}/
+│       ├── .venv/              # Program-specific virtual environment
+│       ├── main.py
+│       ├── requirements.txt
+│       └── ...
 ├── {program_name}.log          # Process log files (auto-generated)
 └── {program_name}.log.1        # Rotated log files (auto-generated)
 ```
+
+### Configuration Files
+
+- **`process_manager.yaml`** - Main configuration and manually configured programs
+- **`uploaded_programs.yaml`** - Auto-managed programs uploaded via web UI
+  - Created automatically when first program is uploaded
+  - Managed entirely by the application
+  - Programs can be removed via web UI
 
 ## Advanced Usage
 
@@ -293,7 +468,7 @@ After=network.target
 Type=simple
 User=your-user
 WorkingDirectory=/path/to/process-manager
-ExecStart=/path/to/.venv/bin/python process_manager.py
+ExecStart=/path/to/.venv/bin/python -m process_manager
 Restart=always
 
 [Install]
@@ -309,7 +484,7 @@ sudo systemctl start process-manager
 #### Using screen/tmux
 
 ```bash
-screen -dmS process-manager python3 process_manager.py
+screen -dmS process-manager python3 -m process_manager
 ```
 
 Reattach:
@@ -332,6 +507,28 @@ screen -r process-manager
 3. Ensure the venv exists and has required dependencies
 4. Check file permissions
 
+### Uploaded Program Installation Issues
+
+**Status stuck on "installing":**
+- Check the program logs for the current status
+- Large dependencies may take several minutes to install
+- Network issues can slow down pip install
+- Installation timeout is 5 minutes - check logs for timeout errors
+
+**Status shows "error":**
+1. Click "Logs" to view detailed error messages
+2. Common issues:
+   - Invalid package names in `requirements.txt`
+   - Python version incompatibility
+   - Missing system dependencies for packages (e.g., gcc for compiled packages)
+3. Fix the issue and re-upload or update the program
+
+**Program starts then immediately crashes:**
+- Check the script name matches exactly (case-sensitive)
+- Verify the script is executable Python code
+- Check for missing imports or syntax errors in logs
+- Ensure `requirements.txt` includes all needed dependencies
+
 ### Manager Can't Connect to Running Process
 
 The manager uses PID files to reconnect. If a process was killed externally:
@@ -344,6 +541,14 @@ The manager uses PID files to reconnect. If a process was killed externally:
 1. Check the configured port isn't already in use
 2. Verify firewall settings allow the port
 3. Check the host binding (`0.0.0.0` vs `127.0.0.1`)
+
+### Upload Modal Not Closing
+
+If the upload modal doesn't close after submitting:
+- Check browser console for JavaScript errors
+- Ensure the server is responding (check terminal output)
+- Try refreshing the page
+- This was a known issue (deadlock bug) - ensure you're using the latest version
 
 ## Dependencies
 
