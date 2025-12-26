@@ -61,6 +61,7 @@ class ProcessManager:
         self.lock = threading.Lock()
         self.config = {}
         self.venv_python = None  # Will be set in load_config()
+        self.global_cwd = None  # Will be set in load_config()
 
         self.load_config()
         self.restore_processes()
@@ -91,6 +92,16 @@ class ProcessManager:
         if not self.venv_python.exists():
             print(f"Warning: venv not found at {self.venv_python}")
             print(f"         Configure 'venv_path' in {self.config_path}")
+
+        # Load global cwd from config (optional)
+        global_cwd = self.config.get("cwd")
+        if global_cwd:
+            global_cwd_path = Path(global_cwd)
+            if not global_cwd_path.is_absolute():
+                global_cwd_path = self.base_dir / global_cwd_path
+            self.global_cwd = global_cwd_path
+        else:
+            self.global_cwd = None
 
         for prog in self.config.get("programs", []):
             name = prog["name"]
@@ -262,12 +273,14 @@ class ProcessManager:
             print(f"[{info.name}] Disabled, not starting")
             return
 
-        # Determine working directory
+        # Determine working directory: program cwd > global cwd > base_dir
         if info.cwd:
             cwd_path = Path(info.cwd)
             if not cwd_path.is_absolute():
                 cwd_path = self.base_dir / cwd_path
             work_dir = cwd_path
+        elif self.global_cwd:
+            work_dir = self.global_cwd
         else:
             work_dir = self.base_dir
 

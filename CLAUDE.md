@@ -46,6 +46,7 @@ The entire application lives in `process_manager.py` (~1,100 lines):
 Edit `process_manager.yaml`:
 - `web_ui`: host, port, title
 - `venv_path`: global Python venv (can override per-program)
+- `cwd`: global working directory (can override per-program)
 - `restart`: delay, max_consecutive_failures, failure_reset_seconds
 - `logging`: max_size_mb for log rotation
 - `programs`: list of {name, script, enabled, venv_path, cwd, args}

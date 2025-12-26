@@ -53,6 +53,9 @@ web_ui:
 # Python Virtual Environment
 venv_path: ".venv"     # Path to venv (relative or absolute)
 
+# Working Directory (optional, can override per-program)
+# cwd: "/path/to/scripts"
+
 # Restart settings
 restart:
   delay_seconds: 1                # Wait time before restart
@@ -83,6 +86,10 @@ programs:
 #### Virtual Environment
 - `venv_path` - Global Python venv path (default: `.venv`)
 - Per-program `venv_path` - Override global venv for specific programs
+
+#### Working Directory
+- `cwd` - Global working directory for all programs (scripts resolved relative to this)
+- Per-program `cwd` - Override global cwd for specific programs
 
 #### Restart Behavior
 - `delay_seconds` - Delay before restarting a failed process
