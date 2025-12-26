@@ -13,6 +13,10 @@ A lightweight, self-contained process manager for Python applications with a bea
 - **Zero Dependencies UI** - No external JavaScript frameworks, pure HTML/CSS/JS
 - **Graceful Shutdown** - Manager stops without killing managed processes
 
+## Screenshot
+
+![Process Manager Web UI](example.png)
+
 ## Installation
 
 ### Requirements
