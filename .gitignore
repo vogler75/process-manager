@@ -141,3 +141,4 @@ nohup.out
 process_manager.pids.json
 process_manager.yaml
 uploaded_programs
+uploaded_programs.yaml
