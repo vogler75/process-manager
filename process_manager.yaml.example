@@ -3,39 +3,81 @@
 
 # Web UI settings
 web_ui:
-  host: "0.0.0.0"
-  port: 10000
-  title: "Test Programs"
+  host: "0.0.0.0"      # Bind to all interfaces (use "127.0.0.1" for localhost only)
+  port: 10000          # Web UI port
+  title: "My Services" # Dashboard title
 
-# Python Virtual Environment
+# Global Python Virtual Environment
 # Path to venv directory (relative to this config file or absolute)
-# Default: .venv (in the same directory as this config)
-# venv_path: ".venv"
+# Can be overridden per-program
+venv: ".venv"
+
+# Global Working Directory (optional)
+# If set, all programs will run in this directory by default
+# Can be overridden per-program
+# cwd: "/data/apps"
 
 # Restart settings
 restart:
-  delay_seconds: 1
-  max_consecutive_failures: 10
-  # Reset failure count after process runs stably for this many seconds
-  # (prevents marking as broken if process runs fine for a while then crashes)
-  failure_reset_seconds: 60
+  delay_seconds: 1                # Wait time before restarting a failed process
+  max_consecutive_failures: 10    # Mark as broken after N consecutive failures
+  failure_reset_seconds: 60       # Reset failure count after stable run (seconds)
 
 # Logging settings
 logging:
-  # Maximum log file size in MB before rotation (copytruncate method)
-  # When exceeded, current log is copied to .log.1 and truncated
-  max_size_mb: 10
+  max_size_mb: 10      # Maximum log file size before rotation (copytruncate method)
 
 # Programs to run and monitor
 programs:
-  - name: "Test Program 1"
-    script: test_program_1.py
+  # Simple program - uses global venv and runs in config directory
+  - name: "Simple App"
+    script: my_app.py
     enabled: true
 
-  - name: "Test Program 2"
-    script: test_program_2.py
+  # Program with command-line arguments
+  - name: "Web Server"
+    script: server.py
     enabled: true
+    args: ["--host", "0.0.0.0", "--port", "8080", "--workers", "4"]
 
-  - name: "Test Program 3"
-    script: test_program_3.py
+  # Program with environment variables
+  - name: "Data Collector"
+    script: collector.py
     enabled: true
+    environment:
+      - PYTHONUNBUFFERED=TRUE
+      - DTU_HOST=192.168.1.132
+      - UPDATE_EVERY=45
+      - LOG_LEVEL=INFO
+
+  # Program with custom venv (e.g., older Python version)
+  - name: "Legacy App"
+    script: legacy_app.py
+    enabled: true
+    venv: ".venv-python37"
+
+  # Program with custom working directory
+  - name: "Background Worker"
+    script: worker.py
+    enabled: true
+    cwd: "/data/apps/worker"
+    args: "--verbose"
+
+  # Full example with all options
+  - name: "Production API"
+    script: api.py
+    enabled: true
+    venv: ".venv-api"                    # Custom virtual environment
+    cwd: "/data/apps/api"                # Custom working directory
+    args: ["--config", "production.yaml"] # Command-line arguments
+    environment:                          # Environment variables
+      - PYTHONUNBUFFERED=TRUE
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://localhost/mydb
+      - REDIS_URL=redis://localhost:6379
+      - API_KEY=your-api-key-here
+
+  # Disabled program (won't auto-start)
+  - name: "Test Program"
+    script: test.py
+    enabled: false
