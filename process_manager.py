@@ -2,7 +2,7 @@
 """
 Process Manager - Runs and monitors Python programs with a lightweight web UI.
 
-Copyright (C) 2026 Andreas Vogler
+Copyright (C) 2025 Andreas Vogler
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
