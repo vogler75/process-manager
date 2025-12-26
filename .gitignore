@@ -136,4 +136,6 @@ dmypy.json
 # Process Manager specific files
 *.log
 *.log.*
+nohup.out
 process_manager.pids.json
+process_manager.yaml

@@ -10,7 +10,8 @@ web_ui:
 # Python Virtual Environment
 # Path to venv directory (relative to this config file or absolute)
 # Default: .venv (in the same directory as this config)
-venv_path: ".venv"
+cwd: "/data/production/trading/trading-coinbase"
+venv_path: "/data/production/trading/trading-coinbase/.venv"  # Optional: use program-specific venv, defaults to global venv_path
 
 # Restart settings
 restart:
@@ -31,8 +32,6 @@ programs:
   - name: "Coinbase to Kafka"
     script: coinbase_to_kafka.py
     enabled: true
-    cwd: "/data/production/trading/trading-coinbase"
-    venv_path: "/data/production/trading/trading-coinbase/.venv"  # Optional: use program-specific venv, defaults to global venv_path
     # args: []  # Optional: command-line arguments
 
   - name: "Kafka to QuestDB"
