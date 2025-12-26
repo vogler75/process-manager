@@ -490,7 +490,12 @@ class ProcessManager:
                     time.sleep(0.1)
                 else:
                     # Force kill if still alive
-
+                    try:
+                        os.killpg(os.getpgid(pid_to_stop), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+            except ProcessLookupError:
+                pass
 
         with self.lock:
             info.process = None
