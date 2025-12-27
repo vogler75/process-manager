@@ -149,6 +149,31 @@ def get_html(title: str = "Process Manager") -> str:
             font-style: italic;
         }
 
+        /* Runtime Type Badges */
+        .type-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+        .type-badge.python {
+            background: rgba(55, 118, 171, 0.25);
+            color: #5b9bd5;
+            border: 1px solid rgba(55, 118, 171, 0.4);
+        }
+        .type-badge.node {
+            background: rgba(104, 159, 56, 0.25);
+            color: #8bc34a;
+            border: 1px solid rgba(104, 159, 56, 0.4);
+        }
+
         .process-stats {
             display: grid;
             grid-template-columns: 1fr 140px;
@@ -697,7 +722,7 @@ def get_html(title: str = "Process Manager") -> str:
                     <div class="process-top">
                         <div class="process-title-group">
                             <div class="process-name" title="${p.name}">${p.name}</div>
-                            <div class="process-script">${p.script}</div>
+                            <div class="process-script">${p.script}<span class="type-badge ${p.type || 'python'}">${p.type || 'python'}</span></div>
                             ${p.comment ? `<div class="process-comment">${p.comment}</div>` : ''}
                         </div>
                         <span class="status ${p.status}">${p.status}</span>
@@ -762,7 +787,7 @@ def get_html(title: str = "Process Manager") -> str:
                     <tbody>
                         ${processes.map(p => `
                             <tr>
-                                <td><span class="table-name">${p.name}</span></td>
+                                <td><span class="table-name">${p.name}</span><span class="type-badge ${p.type || 'python'}">${p.type || 'python'}</span></td>
                                 <td><span class="status ${p.status}">${p.status}</span></td>
                                 <td class="table-info">${p.pid || '-'}</td>
                                 <td class="table-info">${p.uptime || '-'}</td>
