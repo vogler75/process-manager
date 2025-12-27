@@ -14,8 +14,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from collections import deque
 
-# Number of CPU history points to keep (at 1 sample per second = 60 seconds of history)
-CPU_HISTORY_SIZE = 60
+# Number of CPU history points to keep (at 1 sample per second = 300 points = 5 minutes of history)
+CPU_HISTORY_SIZE = 300
 
 
 @dataclass

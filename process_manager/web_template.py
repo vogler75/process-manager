@@ -14,6 +14,7 @@ def get_html(title: str = "Process Manager") -> str:
     html = """<!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>Process Manager - {{TITLE}}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
@@ -29,7 +30,7 @@ def get_html(title: str = "Process Manager") -> str:
 
         /* Main Frame */
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             background: rgba(22, 33, 62, 0.6);
             border-radius: 16px;
@@ -37,6 +38,7 @@ def get_html(title: str = "Process Manager") -> str:
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 60px rgba(0, 212, 255, 0.1);
             backdrop-filter: blur(10px);
             overflow: hidden;
+            width: 95%; /* Ensure it takes up most of the screen */
         }
 
         /* Header */
@@ -92,29 +94,105 @@ def get_html(title: str = "Process Manager") -> str:
         /* Process List */
         .process-list {
             padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 20px;
         }
         .process {
             background: rgba(13, 20, 33, 0.6);
-            border-radius: 10px;
-            padding: 16px 20px;
-            margin-bottom: 12px;
+            border-radius: 16px;
+            padding: 24px;
             display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
+            flex-direction: column;
+            gap: 20px;
             border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         .process:hover {
-            background: rgba(13, 20, 33, 0.8);
-            border-color: rgba(0, 212, 255, 0.2);
-            transform: translateY(-1px);
+            background: rgba(13, 20, 33, 0.85);
+            border-color: rgba(0, 212, 255, 0.3);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
         }
-        .process-info { flex: 1; min-width: 250px; }
-        .process-name { font-weight: 600; font-size: 1.05em; color: #fff; }
-        .process-script { color: #666; font-size: 0.85em; margin-top: 2px; }
-        .process-meta { font-size: 0.8em; color: #888; margin-top: 6px; }
-        .process-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+        
+        /* Card Layout Sections */
+        .process-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .process-title-group { flex: 1; min-width: 0; padding-right: 15px; }
+        .process-name { 
+            font-weight: 700; 
+            font-size: 1.25em; 
+            color: #fff; 
+            margin-bottom: 6px;
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+        }
+        .process-script { 
+            color: #666; 
+            font-size: 0.85em; 
+            font-family: 'Monaco', monospace;
+            background: rgba(255,255,255,0.05);
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .process-stats {
+            display: grid;
+            grid-template-columns: 1fr 140px;
+            gap: 20px;
+            align-items: center;
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.03);
+        }
+        
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 12px;
+        }
+        .stat-item { display: flex; flex-direction: column; gap: 2px; }
+        .stat-label { color: #555; font-size: 0.75em; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+        .stat-value { color: #ccc; font-family: 'Monaco', monospace; font-size: 0.9em; }
+        
+        .cpu-group { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: flex-end; 
+            gap: 5px; 
+            padding-left: 15px;
+            border-left: 1px solid rgba(255,255,255,0.05);
+        }
+        .cpu-val-display { font-size: 1.4em; font-weight: 700; color: #4caf50; letter-spacing: -0.5px; }
+        .cpu-label-mini { font-size: 0.7em; color: #666; text-transform: uppercase; }
+        .cpu-chart-mini {
+            width: 100%;
+            height: 35px;
+            opacity: 0.8;
+        }
+        .cpu-chart-mini svg { display: block; width: 100%; height: 100%; }
+
+        .process-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 10px;
+        }
+        .action-group { display: flex; gap: 8px; }
+        
+        /* Larger buttons for the main card view */
+        .process-actions .btn {
+            padding: 8px 14px;
+            height: 36px;
+        }
 
         /* Status Badges */
         .status {
@@ -134,27 +212,52 @@ def get_html(title: str = "Process Manager") -> str:
         .status.error { background: rgba(255, 152, 0, 0.2); color: #ff9800; border: 1px solid rgba(255, 152, 0, 0.3); }
 
         /* Buttons */
-        .actions { display: flex; gap: 6px; flex-wrap: wrap; }
         .btn {
             padding: 6px 12px;
             border: none;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 0.8em;
-            font-weight: 500;
+            font-size: 0.9em;
+            font-weight: 600;
             transition: all 0.2s ease;
             white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 36px;
+            height: 36px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
-        .btn-placeholder { visibility: hidden; pointer-events: none; }
-        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
+        .btn svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+            display: block;
+            margin-right: 6px;
+        }
+        .process-table .btn svg { margin-right: 0; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); filter: brightness(1.1); }
         .btn:active { transform: translateY(0); }
-        .btn:disabled { background: #444; cursor: not-allowed; opacity: 0.5; transform: none; box-shadow: none; }
-        .btn-start { background: linear-gradient(135deg, #4caf50, #45a049); color: white; }
-        .btn-stop { background: linear-gradient(135deg, #f44336, #d32f2f); color: white; }
-        .btn-restart { background: linear-gradient(135deg, #2196f3, #1976d2); color: white; }
+        .btn:disabled { background: #444; cursor: not-allowed; opacity: 0.5; transform: none; box-shadow: none; color: #888; }
+        
+        /* Gradient Button Styles */
+        .btn-start { background: linear-gradient(135deg, #4caf50, #2e7d32); color: white; }
+        .btn-stop { background: linear-gradient(135deg, #f44336, #c62828); color: white; }
+        .btn-restart { background: linear-gradient(135deg, #2196f3, #1565c0); color: white; }
         .btn-logs { background: linear-gradient(135deg, #9c27b0, #7b1fa2); color: white; }
-        .btn-remove { background: linear-gradient(135deg, #ff5722, #e64a19); color: white; }
-        .btn-update { background: linear-gradient(135deg, #ff9800, #f57c00); color: white; }
+        .btn-remove { background: linear-gradient(135deg, #ff5722, #d84315); color: white; }
+        .btn-update { background: linear-gradient(135deg, #ff9800, #ef6c00); color: white; }
+        
+        .process-footer {
+            padding: 15px 24px;
+            background: rgba(0, 0, 0, 0.2);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .action-group { display: flex; gap: 10px; }
+        
         .btn-upload-header { background: linear-gradient(135deg, #00bcd4, #0097a7); color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 600; transition: all 0.2s ease; }
         .btn-upload-header:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 188, 212, 0.4); }
         .btn-reload-config { background: linear-gradient(135deg, #ff9800, #f57c00); color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 600; transition: all 0.2s ease; }
@@ -167,13 +270,14 @@ def get_html(title: str = "Process Manager") -> str:
         .process-table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: auto; /* Let columns adjust */
         }
         .process-table thead {
             background: rgba(0, 212, 255, 0.1);
             border-bottom: 2px solid rgba(0, 212, 255, 0.3);
         }
         .process-table th {
-            padding: 12px 15px;
+            padding: 6px 12px;
             text-align: left;
             color: #00d4ff;
             font-weight: 600;
@@ -182,9 +286,11 @@ def get_html(title: str = "Process Manager") -> str:
             letter-spacing: 0.5px;
         }
         .process-table td {
-            padding: 10px 15px;
+            padding: 4px 12px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             font-size: 0.9em;
+            vertical-align: middle;
+            white-space: nowrap; /* Force single line */
         }
         .process-table tbody tr {
             background: rgba(13, 20, 33, 0.4);
@@ -197,14 +303,26 @@ def get_html(title: str = "Process Manager") -> str:
         .table-info { color: #888; font-size: 0.85em; }
         .table-actions { white-space: nowrap; }
         .table-actions .actions { gap: 4px; }
-        .table-actions .btn { padding: 4px 10px; font-size: 0.75em; }
+        .table-actions .btn { padding: 4px; font-size: 0.75em; min-width: 28px; height: 28px; }
+        .table-actions .btn svg { width: 14px; height: 14px; margin-right: 0; }
         .view-card .process-table { display: none; }
         .view-table .process-list .process { display: none; }
         .view-table .process-table { display: table; }
+        .view-table .process-list { display: block; padding: 0; }
+
+        .container.view-table {
+            max-width: none;
+            width: 100%;
+            margin: 0;
+            border-radius: 0;
+            border: none;
+            min-height: 100vh;
+            padding: 0 10px;
+        }
 
         /* Footer */
         .footer {
-            padding: 15px 25px;
+            padding: 10px 25px;
             border-top: 1px solid rgba(255, 255, 255, 0.05);
             color: #666;
             font-size: 0.8em;
@@ -213,18 +331,7 @@ def get_html(title: str = "Process Manager") -> str:
 
         .log-size { color: #666; font-size: 0.75em; margin-left: 8px; }
 
-        /* CPU Chart Styles */
-        .cpu-container { display: flex; align-items: center; gap: 10px; min-width: 150px; }
-        .cpu-chart {
-            width: 80px;
-            height: 28px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 6px;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .cpu-chart svg { display: block; }
-        .cpu-value { font-size: 0.9em; color: #4caf50; font-weight: 600; min-width: 50px; text-align: right; }
+        /* Removed old CPU chart styles */
 
         /* Log Modal Styles */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; backdrop-filter: blur(4px); }
@@ -283,22 +390,23 @@ def get_html(title: str = "Process Manager") -> str:
 
         /* Responsive Design */
         @media (max-width: 1200px) {
-            .container { max-width: 95%; margin: 10px auto; }
+            .container { max-width: 98%; margin: 10px auto; }
         }
 
         @media (max-width: 900px) {
-            .process-controls { width: 100%; justify-content: flex-start; }
-            .cpu-container { order: 1; }
-            .status { order: 2; }
-            .actions { order: 3; width: 100%; }
+            .process-list {
+                grid-template-columns: 1fr;
+            }
         }
 
         @media (max-width: 600px) {
-            .header { flex-direction: column; gap: 15px; align-items: flex-start; }
-            .process { padding: 12px 15px; }
-            .process-info { min-width: 100%; }
-            .btn { padding: 5px 10px; font-size: 0.75em; }
-            .cpu-container { display: none; }
+            .header { padding: 15px; flex-direction: column; gap: 15px; align-items: stretch; }
+            .header > div { width: 100%; }
+            .header div[style*="display: flex"] { flex-wrap: wrap; justify-content: center; }
+            .process { padding: 15px; }
+            .process-controls { flex-direction: column; gap: 12px; padding: 12px; }
+            .actions { width: 100%; justify-content: center; }
+            .cpu-container { width: 100%; justify-content: center; }
         }
     </style>
 </head>
@@ -399,23 +507,21 @@ def get_html(title: str = "Process Manager") -> str:
         let totalLines = 0;
         let tailInterval = null;
 
-        function renderSparkline(data) {
+        function renderSparkline(data, width = 400, height = 60) {
             if (!data || data.length === 0) {
-                return '<svg width="80" height="24"></svg>';
+                return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"></svg>`;
             }
 
-            const width = 80;
-            const height = 24;
             const padding = 2;
             const maxVal = Math.max(...data, 10); // At least 10% scale for visibility
 
-            // Take last 30 points for display (30 seconds of history)
-            const displayData = data.slice(-30);
-            const stepX = (width - padding * 2) / Math.max(displayData.length - 1, 1);
+            // Display up to 300 points (5 minutes)
+            const displayData = data.slice(-300);
+            const stepX = width / Math.max(displayData.length - 1, 1);
 
             // Generate path points
             const points = displayData.map((val, i) => {
-                const x = padding + i * stepX;
+                const x = i * stepX;
                 const y = height - padding - ((val / maxVal) * (height - padding * 2));
                 return `${x},${y}`;
             }).join(' ');
@@ -426,10 +532,19 @@ def get_html(title: str = "Process Manager") -> str:
             if (avg > 50) color = '#ff9800'; // Orange
             if (avg > 80) color = '#f44336'; // Red
 
-            return `<svg width="${width}" height="${height}">
-                <polyline fill="none" stroke="${color}" stroke-width="1.5" points="${points}"/>
+            return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+                <polyline fill="none" stroke="${color}" stroke-width="2" points="${points}"/>
             </svg>`;
         }
+
+        const ICONS = {
+            start: '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',
+            stop: '<svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>',
+            restart: '<svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>',
+            logs: '<svg viewBox="0 0 24 24"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>',
+            update: '<svg viewBox="0 0 24 24"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>',
+            remove: '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>'
+        };
 
         async function fetchStatus() {
             try {
@@ -447,35 +562,52 @@ def get_html(title: str = "Process Manager") -> str:
             // Card view (existing)
             const cardHtml = processes.map(p => `
                 <div class="process">
-                    <div class="process-info">
-                        <div class="process-name">${p.name}${p.log_size_display ? `<span class="log-size">(Log: ${p.log_size_display})</span>` : ''}</div>
-                        <div class="process-script">${p.script}</div>
-                        <div class="process-meta">
-                            ${p.pid ? `PID: ${p.pid}` : ''}
-                            ${p.uptime ? ` | Uptime: ${p.uptime}` : ''}
-                            ${p.total_restarts ? ` | Restarts: ${p.total_restarts}` : ''}
-                            ${p.is_broken ? ` | Failures: ${p.consecutive_failures}` : ''}
-                        </div>
-                    </div>
-                    <div class="process-controls">
-                        <div class="cpu-container">
-                            <div class="cpu-chart">${renderSparkline(p.cpu_history)}</div>
-                            <span class="cpu-value">${p.cpu_current.toFixed(1)}%</span>
+                    <div class="process-top">
+                        <div class="process-title-group">
+                            <div class="process-name" title="${p.name}">${p.name}</div>
+                            <div class="process-script">${p.script}</div>
                         </div>
                         <span class="status ${p.status}">${p.status}</span>
-                        <div class="actions">
-                            ${p.status === 'stopped' || p.is_broken ?
-                                `<button class="btn btn-start" onclick="action('start', '${p.name}')">Start</button>` :
-                                `<button class="btn btn-stop" onclick="action('stop', '${p.name}')" ${p.status === 'stopping' ? 'disabled' : ''}>Stop</button>`}
-                            <button class="btn btn-restart" onclick="action('restart', '${p.name}')" ${p.status === 'stopping' || p.status === 'restarting' ? 'disabled' : ''}>Restart</button>
-                            <button class="btn btn-logs" onclick="openLogModal('${p.name}')">Logs</button>
+                    </div>
+
+                    <div class="process-stats">
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <span class="stat-label">PID</span>
+                                <span class="stat-value">${p.pid || '-'}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Uptime</span>
+                                <span class="stat-value">${p.uptime || '-'}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Restarts</span>
+                                <span class="stat-value">${p.total_restarts}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Log</span>
+                                <span class="stat-value">${p.log_size_display || '0 B'}</span>
+                            </div>
+                        </div>
+                        <div class="cpu-group">
+                            <div class="cpu-val-display">${p.cpu_current.toFixed(1)}%</div>
+                            <div class="cpu-chart-mini">${renderSparkline(p.cpu_history, 120, 35)}</div>
+                        </div>
+                    </div>
+
+                    <div class="process-footer">
+                        <div class="action-group">
+                            <button class="btn btn-logs" onclick="openLogModal('${p.name}')" title="Logs">${ICONS.logs} Logs</button>
                             ${p.uploaded ? `
-                                ${p.status === 'stopped' ? `<button class="btn btn-update" onclick="openUpdateModal('${p.name}')">Update</button>` : `<button class="btn btn-update btn-placeholder">Update</button>`}
-                                ${p.status === 'stopped' ? `<button class="btn btn-remove" onclick="removeProgram('${p.name}')">Remove</button>` : `<button class="btn btn-remove btn-placeholder">Remove</button>`}
-                            ` : `
-                                <button class="btn btn-update btn-placeholder">Update</button>
-                                <button class="btn btn-remove btn-placeholder">Remove</button>
-                            `}
+                                <button class="btn btn-update" onclick="openUpdateModal('${p.name}')" title="Update">${ICONS.update} Update</button>
+                                <button class="btn btn-remove" onclick="removeProgram('${p.name}')" title="Remove">${ICONS.remove} Remove</button>
+                            ` : ''}
+                        </div>
+                        <div class="action-group">
+                            <button class="btn btn-restart" onclick="action('restart', '${p.name}')" ${p.status === 'stopping' || p.status === 'restarting' ? 'disabled' : ''} title="Restart">${ICONS.restart} Restart</button>
+                            ${p.status === 'stopped' || p.is_broken ?
+                                `<button class="btn btn-start" onclick="action('start', '${p.name}')" title="Start">${ICONS.start} Start</button>` :
+                                `<button class="btn btn-stop" onclick="action('stop', '${p.name}')" ${p.status === 'stopping' ? 'disabled' : ''} title="Stop">${ICONS.stop} Stop</button>`}
                         </div>
                     </div>
                 </div>
@@ -488,7 +620,9 @@ def get_html(title: str = "Process Manager") -> str:
                         <tr>
                             <th>Name</th>
                             <th>Status</th>
-                            <th>PID / Uptime</th>
+                            <th>PID</th>
+                            <th>Uptime</th>
+                            <th>Log Size</th>
                             <th>CPU</th>
                             <th>Restarts</th>
                             <th>Actions</th>
@@ -497,32 +631,28 @@ def get_html(title: str = "Process Manager") -> str:
                     <tbody>
                         ${processes.map(p => `
                             <tr>
-                                <td>
-                                    <div class="table-name">${p.name}</div>
-                                    ${p.log_size_display ? `<div class="table-info">Log: ${p.log_size_display}</div>` : ''}
-                                </td>
+                                <td><span class="table-name">${p.name}</span></td>
                                 <td><span class="status ${p.status}">${p.status}</span></td>
-                                <td class="table-info">
-                                    ${p.pid ? `PID: ${p.pid}` : '-'}<br>
-                                    ${p.uptime || '-'}
-                                </td>
-                                <td>
-                                    <div class="cpu-container">
-                                        <div class="cpu-chart">${renderSparkline(p.cpu_history)}</div>
-                                        <span class="cpu-value">${p.cpu_current.toFixed(1)}%</span>
+                                <td class="table-info">${p.pid || '-'}</td>
+                                <td class="table-info">${p.uptime || '-'}</td>
+                                <td class="table-info">${p.log_size_display || '-'}</td>
+                                 <td>
+                                    <div style="width: 100px; height: 24px; background: rgba(0,0,0,0.2); border-radius: 4px; overflow: hidden;">
+                                        ${renderSparkline(p.cpu_history, 100, 24)}
                                     </div>
+                                    <div class="cpu-value" style="font-size: 0.8em; text-align: right; margin-top: 2px;">${p.cpu_current.toFixed(1)}%</div>
                                 </td>
                                 <td class="table-info">${p.total_restarts || 0}${p.is_broken ? ` (${p.consecutive_failures} fails)` : ''}</td>
-                                <td class="table-actions">
+                                 <td class="table-actions">
                                     <div class="actions">
                                         ${p.status === 'stopped' || p.is_broken ?
-                                            `<button class="btn btn-start" onclick="action('start', '${p.name}')">Start</button>` :
-                                            `<button class="btn btn-stop" onclick="action('stop', '${p.name}')" ${p.status === 'stopping' ? 'disabled' : ''}>Stop</button>`}
-                                        <button class="btn btn-restart" onclick="action('restart', '${p.name}')" ${p.status === 'stopping' || p.status === 'restarting' ? 'disabled' : ''}>Restart</button>
-                                        <button class="btn btn-logs" onclick="openLogModal('${p.name}')">Logs</button>
+                                            `<button class="btn btn-start" onclick="action('start', '${p.name}')" title="Start">${ICONS.start}</button>` :
+                                            `<button class="btn btn-stop" onclick="action('stop', '${p.name}')" ${p.status === 'stopping' ? 'disabled' : ''} title="Stop">${ICONS.stop}</button>`}
+                                        <button class="btn btn-restart" onclick="action('restart', '${p.name}')" ${p.status === 'stopping' || p.status === 'restarting' ? 'disabled' : ''} title="Restart">${ICONS.restart}</button>
+                                        <button class="btn btn-logs" onclick="openLogModal('${p.name}')" title="Logs">${ICONS.logs}</button>
                                         ${p.uploaded ? `
-                                            ${p.status === 'stopped' ? `<button class="btn btn-update" onclick="openUpdateModal('${p.name}')">Update</button>` : ''}
-                                            ${p.status === 'stopped' ? `<button class="btn btn-remove" onclick="removeProgram('${p.name}')">Remove</button>` : ''}
+                                            ${p.status === 'stopped' ? `<button class="btn btn-update" onclick="openUpdateModal('${p.name}')" title="Update">${ICONS.update}</button>` : ''}
+                                            ${p.status === 'stopped' ? `<button class="btn btn-remove" onclick="removeProgram('${p.name}')" title="Remove">${ICONS.remove}</button>` : ''}
                                         ` : ''}
                                     </div>
                                 </td>

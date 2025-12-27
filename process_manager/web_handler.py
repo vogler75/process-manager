@@ -60,7 +60,7 @@ class WebHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/" or self.path == "/index.html":
             self.send_response(200)
-            self.send_header("Content-type", "text/html")
+            self.send_header("Content-type", "text/html; charset=utf-8")
             self.end_headers()
             self.wfile.write(get_html(self.manager.web_title).encode())
         elif self.path == "/api/status":
@@ -80,7 +80,7 @@ class WebHandler(BaseHTTPRequestHandler):
 
                 result = self.manager.get_log_content(name, lines, offset)
                 self.send_response(200)
-                self.send_header("Content-type", "application/json")
+                self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(json.dumps(result).encode())
             else:
@@ -113,7 +113,7 @@ class WebHandler(BaseHTTPRequestHandler):
                 name = unquote(parts[3])
                 result = self.manager.remove_program(name)
                 self.send_response(200 if result["success"] else 400)
-                self.send_header("Content-type", "application/json")
+                self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(json.dumps(result).encode())
             else:
@@ -134,7 +134,7 @@ class WebHandler(BaseHTTPRequestHandler):
                     success = self.manager.start_program(name)
 
                 self.send_response(200 if success else 404)
-                self.send_header("Content-type", "application/json")
+                self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(json.dumps({"success": success}).encode())
                 return
@@ -149,7 +149,7 @@ class WebHandler(BaseHTTPRequestHandler):
             content_type = self.headers.get('Content-Type')
             if not content_type or not content_type.startswith('multipart/form-data'):
                 self.send_response(400)
-                self.send_header("Content-type", "application/json")
+                self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(json.dumps({"success": False, "message": "Invalid content type"}).encode())
                 return
@@ -176,7 +176,7 @@ class WebHandler(BaseHTTPRequestHandler):
             # Get ZIP file
             if 'zipfile' not in files:
                 self.send_response(400)
-                self.send_header("Content-type", "application/json")
+                self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(json.dumps({"success": False, "message": "No ZIP file provided"}).encode())
                 return
@@ -186,7 +186,7 @@ class WebHandler(BaseHTTPRequestHandler):
             # Validate required fields
             if not name or not script:
                 self.send_response(400)
-                self.send_header("Content-type", "application/json")
+                self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(json.dumps({"success": False, "message": "Name and script are required"}).encode())
                 return
@@ -211,7 +211,7 @@ class WebHandler(BaseHTTPRequestHandler):
             content_type = self.headers.get('Content-Type')
             if not content_type or not content_type.startswith('multipart/form-data'):
                 self.send_response(400)
-                self.send_header("Content-type", "application/json")
+                self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(json.dumps({"success": False, "message": "Invalid content type"}).encode())
                 return
@@ -227,7 +227,7 @@ class WebHandler(BaseHTTPRequestHandler):
             # Get ZIP file
             if 'zipfile' not in files:
                 self.send_response(400)
-                self.send_header("Content-type", "application/json")
+                self.send_header("Content-type", "application/json; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(json.dumps({"success": False, "message": "No ZIP file provided"}).encode())
                 return
