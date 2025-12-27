@@ -160,6 +160,47 @@ def get_html(title: str = "Process Manager") -> str:
         .btn-reload-config { background: linear-gradient(135deg, #ff9800, #f57c00); color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 600; transition: all 0.2s ease; }
         .btn-reload-config:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4); }
         .btn-reload-config:disabled { background: #444; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-view-toggle { background: linear-gradient(135deg, #673ab7, #512da8); color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 600; transition: all 0.2s ease; }
+        .btn-view-toggle:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(103, 58, 183, 0.4); }
+
+        /* Table View */
+        .process-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .process-table thead {
+            background: rgba(0, 212, 255, 0.1);
+            border-bottom: 2px solid rgba(0, 212, 255, 0.3);
+        }
+        .process-table th {
+            padding: 12px 15px;
+            text-align: left;
+            color: #00d4ff;
+            font-weight: 600;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .process-table td {
+            padding: 10px 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.9em;
+        }
+        .process-table tbody tr {
+            background: rgba(13, 20, 33, 0.4);
+            transition: background 0.2s ease;
+        }
+        .process-table tbody tr:hover {
+            background: rgba(13, 20, 33, 0.7);
+        }
+        .table-name { font-weight: 600; color: #fff; }
+        .table-info { color: #888; font-size: 0.85em; }
+        .table-actions { white-space: nowrap; }
+        .table-actions .actions { gap: 4px; }
+        .table-actions .btn { padding: 4px 10px; font-size: 0.75em; }
+        .view-card .process-table { display: none; }
+        .view-table .process-list .process { display: none; }
+        .view-table .process-table { display: table; }
 
         /* Footer */
         .footer {
@@ -269,6 +310,7 @@ def get_html(title: str = "Process Manager") -> str:
                 <span class="header-subtitle">{{TITLE}}</span>
             </div>
             <div style="display: flex; gap: 15px; align-items: center;">
+                <button class="btn btn-view-toggle" onclick="toggleView()" id="btnViewToggle">Table View</button>
                 <button class="btn btn-reload-config" onclick="reloadConfig()" id="btnReloadConfig">Reload Configuration</button>
                 <button class="btn btn-upload-header" onclick="openUploadModal()">+ Upload Program</button>
                 <div class="header-status" id="headerStatus">
@@ -401,7 +443,9 @@ def get_html(title: str = "Process Manager") -> str:
 
         function render(processes) {
             const container = document.getElementById('processes');
-            container.innerHTML = processes.map(p => `
+
+            // Card view (existing)
+            const cardHtml = processes.map(p => `
                 <div class="process">
                     <div class="process-info">
                         <div class="process-name">${p.name}${p.log_size_display ? `<span class="log-size">(Log: ${p.log_size_display})</span>` : ''}</div>
@@ -436,6 +480,59 @@ def get_html(title: str = "Process Manager") -> str:
                     </div>
                 </div>
             `).join('');
+
+            // Table view (compact)
+            const tableHtml = `
+                <table class="process-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>PID / Uptime</th>
+                            <th>CPU</th>
+                            <th>Restarts</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${processes.map(p => `
+                            <tr>
+                                <td>
+                                    <div class="table-name">${p.name}</div>
+                                    ${p.log_size_display ? `<div class="table-info">Log: ${p.log_size_display}</div>` : ''}
+                                </td>
+                                <td><span class="status ${p.status}">${p.status}</span></td>
+                                <td class="table-info">
+                                    ${p.pid ? `PID: ${p.pid}` : '-'}<br>
+                                    ${p.uptime || '-'}
+                                </td>
+                                <td>
+                                    <div class="cpu-container">
+                                        <div class="cpu-chart">${renderSparkline(p.cpu_history)}</div>
+                                        <span class="cpu-value">${p.cpu_current.toFixed(1)}%</span>
+                                    </div>
+                                </td>
+                                <td class="table-info">${p.total_restarts || 0}${p.is_broken ? ` (${p.consecutive_failures} fails)` : ''}</td>
+                                <td class="table-actions">
+                                    <div class="actions">
+                                        ${p.status === 'stopped' || p.is_broken ?
+                                            `<button class="btn btn-start" onclick="action('start', '${p.name}')">Start</button>` :
+                                            `<button class="btn btn-stop" onclick="action('stop', '${p.name}')" ${p.status === 'stopping' ? 'disabled' : ''}>Stop</button>`}
+                                        <button class="btn btn-restart" onclick="action('restart', '${p.name}')" ${p.status === 'stopping' || p.status === 'restarting' ? 'disabled' : ''}>Restart</button>
+                                        <button class="btn btn-logs" onclick="openLogModal('${p.name}')">Logs</button>
+                                        ${p.uploaded ? `
+                                            ${p.status === 'stopped' ? `<button class="btn btn-update" onclick="openUpdateModal('${p.name}')">Update</button>` : ''}
+                                            ${p.status === 'stopped' ? `<button class="btn btn-remove" onclick="removeProgram('${p.name}')">Remove</button>` : ''}
+                                        ` : ''}
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            container.innerHTML = cardHtml + tableHtml;
 
             // Update header status
             updateHeaderStatus(processes);
@@ -700,6 +797,39 @@ def get_html(title: str = "Process Manager") -> str:
                 btn.textContent = 'Reload Configuration';
             }
         }
+
+        function toggleView() {
+            const container = document.querySelector('.container');
+            const btn = document.getElementById('btnViewToggle');
+            const currentView = localStorage.getItem('viewMode') || 'card';
+
+            if (currentView === 'card') {
+                container.classList.remove('view-card');
+                container.classList.add('view-table');
+                localStorage.setItem('viewMode', 'table');
+                btn.textContent = 'Card View';
+            } else {
+                container.classList.remove('view-table');
+                container.classList.add('view-card');
+                localStorage.setItem('viewMode', 'card');
+                btn.textContent = 'Table View';
+            }
+        }
+
+        // Initialize view on page load
+        (function initView() {
+            const container = document.querySelector('.container');
+            const btn = document.getElementById('btnViewToggle');
+            const savedView = localStorage.getItem('viewMode') || 'card';
+
+            if (savedView === 'table') {
+                container.classList.add('view-table');
+                btn.textContent = 'Card View';
+            } else {
+                container.classList.add('view-card');
+                btn.textContent = 'Table View';
+            }
+        })();
 
         fetchStatus();
         setInterval(fetchStatus, 2000);
