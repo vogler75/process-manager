@@ -93,12 +93,22 @@ class WebHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/upload":
             self._handle_upload()
+        elif self.path == "/api/add":
+            self._handle_add()
         elif self.path == "/api/reload-config":
             result = self.manager.reload_config()
             self.send_response(200 if result["success"] else 400)
             self.send_header("Content-type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(result).encode())
+        elif self.path.startswith("/api/edit/"):
+            parts = self.path.split("/")
+            if len(parts) >= 4:
+                name = unquote(parts[3])
+                self._handle_edit(name)
+            else:
+                self.send_response(400)
+                self.end_headers()
         elif self.path.startswith("/api/update/"):
             parts = self.path.split("/")
             if len(parts) >= 4:
@@ -166,6 +176,7 @@ class WebHandler(BaseHTTPRequestHandler):
             # Extract fields
             name = fields.get('name')
             script = fields.get('script')
+            comment = fields.get('comment', '').strip() or None
             # Checkbox only sends value when checked, nothing when unchecked
             enabled = 'enabled' in fields
             args_str = fields.get('args', '')
@@ -192,7 +203,7 @@ class WebHandler(BaseHTTPRequestHandler):
                 return
 
             # Upload program
-            result = self.manager.upload_program(name, zip_data, script, enabled, args, environment)
+            result = self.manager.upload_program(name, zip_data, script, enabled, args, environment, comment)
 
             self.send_response(200 if result["success"] else 400)
             self.send_header("Content-type", "application/json")
@@ -247,3 +258,70 @@ class WebHandler(BaseHTTPRequestHandler):
             self.send_header("Content-type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"success": False, "message": f"Update error: {str(e)}"}).encode())
+
+    def _handle_edit(self, name: str):
+        """Handle program configuration edit via JSON body."""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            updates = json.loads(body.decode('utf-8'))
+
+            result = self.manager.edit_program(name, updates)
+
+            self.send_response(200 if result["success"] else 400)
+            self.send_header("Content-type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+        except json.JSONDecodeError:
+            self.send_response(400)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": False, "message": "Invalid JSON"}).encode())
+        except Exception as e:
+            self.send_response(500)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": False, "message": str(e)}).encode())
+
+    def _handle_add(self):
+        """Handle adding a new program via JSON body."""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            data = json.loads(body.decode('utf-8'))
+
+            name = data.get("name")
+            script = data.get("script")
+
+            if not name or not script:
+                self.send_response(400)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "message": "Name and script are required"}).encode())
+                return
+
+            result = self.manager.add_program(
+                name=name,
+                script=script,
+                enabled=data.get("enabled", True),
+                comment=data.get("comment"),
+                venv=data.get("venv"),
+                cwd=data.get("cwd"),
+                args=data.get("args"),
+                environment=data.get("environment")
+            )
+
+            self.send_response(200 if result["success"] else 400)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(result).encode())
+        except json.JSONDecodeError:
+            self.send_response(400)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": False, "message": "Invalid JSON"}).encode())
+        except Exception as e:
+            self.send_response(500)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": False, "message": str(e)}).encode())

@@ -133,14 +133,20 @@ def get_html(title: str = "Process Manager") -> str:
             overflow: hidden; 
             text-overflow: ellipsis; 
         }
-        .process-script { 
-            color: #666; 
-            font-size: 0.85em; 
+        .process-script {
+            color: #666;
+            font-size: 0.85em;
             font-family: 'Monaco', monospace;
             background: rgba(255,255,255,0.05);
             padding: 2px 6px;
             border-radius: 4px;
             display: inline-block;
+        }
+        .process-comment {
+            color: #888;
+            font-size: 0.8em;
+            margin-top: 4px;
+            font-style: italic;
         }
 
         .process-stats {
@@ -247,6 +253,8 @@ def get_html(title: str = "Process Manager") -> str:
         .btn-logs { background: linear-gradient(135deg, #9c27b0, #7b1fa2); color: white; }
         .btn-remove { background: linear-gradient(135deg, #ff5722, #d84315); color: white; }
         .btn-update { background: linear-gradient(135deg, #ff9800, #ef6c00); color: white; }
+        .btn-edit { background: linear-gradient(135deg, #607d8b, #455a64); color: white; }
+        .btn-add { background: linear-gradient(135deg, #00bcd4, #0097a7); color: white; }
         
         .process-footer {
             padding: 12px 16px;
@@ -439,6 +447,7 @@ def get_html(title: str = "Process Manager") -> str:
             <div style="display: flex; gap: 15px; align-items: center;">
                 <button class="btn btn-view-toggle" onclick="toggleView()" id="btnViewToggle">Table View</button>
                 <button class="btn btn-reload-config" onclick="reloadConfig()" id="btnReloadConfig">Reload Configuration</button>
+                <button class="btn btn-add" onclick="openAddModal()">+ Add Program</button>
                 <button class="btn btn-upload-header" onclick="openUploadModal()">+ Upload Program</button>
                 <div class="header-status" id="headerStatus">
                     <span class="dot"></span>
@@ -497,6 +506,10 @@ def get_html(title: str = "Process Manager") -> str:
                         <div class="hint">ZIP archive containing your Python program (max 50MB)</div>
                     </div>
                     <div class="form-group">
+                        <label for="programComment">Comment (optional)</label>
+                        <textarea id="programComment" name="comment" rows="2" placeholder="Description or notes about this program"></textarea>
+                    </div>
+                    <div class="form-group">
                         <label for="programArgs">Arguments (optional)</label>
                         <input type="text" id="programArgs" name="args" placeholder="--port 8000 --debug">
                         <div class="hint">Space-separated command-line arguments</div>
@@ -514,6 +527,119 @@ def get_html(title: str = "Process Manager") -> str:
                     </div>
                     <div class="upload-status" id="uploadStatus"></div>
                     <button type="submit" class="btn-submit" id="uploadBtn">Upload Program</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Program Modal -->
+    <div id="editModal" class="modal-overlay">
+        <div class="modal upload-modal">
+            <div class="modal-header">
+                <h2 id="editModalTitle">Edit Program</h2>
+                <button class="modal-close" onclick="closeEditModal()">Close</button>
+            </div>
+            <div class="upload-form-body">
+                <form id="editForm" onsubmit="handleEdit(event)">
+                    <input type="hidden" id="editOriginalName">
+                    <div class="form-group">
+                        <label for="editProgramName">Program Name *</label>
+                        <input type="text" id="editProgramName" name="name" required>
+                        <div class="hint">Changing the name will rename the program</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editScript">Entry Script *</label>
+                        <input type="text" id="editScript" name="script" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editComment">Comment (optional)</label>
+                        <textarea id="editComment" name="comment" rows="2" placeholder="Description or notes about this program"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="editVenv">Virtual Environment (optional)</label>
+                        <input type="text" id="editVenv" name="venv" placeholder=".venv or /path/to/venv">
+                        <div class="hint">Leave empty to use global venv</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editCwd">Working Directory (optional)</label>
+                        <input type="text" id="editCwd" name="cwd" placeholder="/path/to/directory">
+                        <div class="hint">Leave empty to use global cwd</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editArgs">Arguments (optional)</label>
+                        <input type="text" id="editArgs" name="args" placeholder="--port 8000 --debug">
+                    </div>
+                    <div class="form-group">
+                        <label for="editEnvironment">Environment Variables (optional)</label>
+                        <textarea id="editEnvironment" name="environment" rows="3" placeholder="KEY=VALUE (one per line)"></textarea>
+                    </div>
+                    <div class="form-group" id="editZipGroup" style="display: none;">
+                        <label for="editZipFile">Update Code (optional)</label>
+                        <input type="file" id="editZipFile" name="zipfile" accept=".zip">
+                        <div class="hint">Upload a new ZIP to replace the program files (keeps venv)</div>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="editEnabled" name="enabled">
+                            Enabled (auto-start when manager starts)
+                        </label>
+                    </div>
+                    <div class="upload-status" id="editStatus"></div>
+                    <button type="submit" class="btn-submit" id="editBtn">Save Changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Program Modal -->
+    <div id="addModal" class="modal-overlay">
+        <div class="modal upload-modal">
+            <div class="modal-header">
+                <h2>Add Program</h2>
+                <button class="modal-close" onclick="closeAddModal()">Close</button>
+            </div>
+            <div class="upload-form-body">
+                <form id="addForm" onsubmit="handleAdd(event)">
+                    <div class="form-group">
+                        <label for="addProgramName">Program Name *</label>
+                        <input type="text" id="addProgramName" name="name" required placeholder="My Application">
+                        <div class="hint">Unique name for this program</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="addScript">Entry Script *</label>
+                        <input type="text" id="addScript" name="script" required placeholder="main.py or /path/to/script.py">
+                        <div class="hint">Python script to execute</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="addComment">Comment (optional)</label>
+                        <textarea id="addComment" name="comment" rows="2" placeholder="Description or notes about this program"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="addVenv">Virtual Environment (optional)</label>
+                        <input type="text" id="addVenv" name="venv" placeholder=".venv or /path/to/venv">
+                        <div class="hint">Leave empty to use global venv</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="addCwd">Working Directory (optional)</label>
+                        <input type="text" id="addCwd" name="cwd" placeholder="/path/to/directory">
+                        <div class="hint">Leave empty to use global cwd</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="addArgs">Arguments (optional)</label>
+                        <input type="text" id="addArgs" name="args" placeholder="--port 8000 --debug">
+                    </div>
+                    <div class="form-group">
+                        <label for="addEnvironment">Environment Variables (optional)</label>
+                        <textarea id="addEnvironment" name="environment" rows="3" placeholder="KEY=VALUE (one per line)"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="addEnabled" name="enabled" checked>
+                            Start automatically after adding
+                        </label>
+                    </div>
+                    <div class="upload-status" id="addStatus"></div>
+                    <button type="submit" class="btn-submit" id="addBtn">Add Program</button>
                 </form>
             </div>
         </div>
@@ -581,7 +707,9 @@ def get_html(title: str = "Process Manager") -> str:
             restart: '<svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>',
             logs: '<svg viewBox="0 0 24 24"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>',
             update: '<svg viewBox="0 0 24 24"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>',
-            remove: '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>'
+            remove: '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>',
+            edit: '<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>',
+            add: '<svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>'
         };
 
         async function fetchStatus() {
@@ -604,6 +732,7 @@ def get_html(title: str = "Process Manager") -> str:
                         <div class="process-title-group">
                             <div class="process-name" title="${p.name}">${p.name}</div>
                             <div class="process-script">${p.script}</div>
+                            ${p.comment ? `<div class="process-comment">${p.comment}</div>` : ''}
                         </div>
                         <span class="status ${p.status}">${p.status}</span>
                     </div>
@@ -636,10 +765,8 @@ def get_html(title: str = "Process Manager") -> str:
                     <div class="process-footer">
                         <div class="action-group">
                             <button class="btn btn-logs" onclick="openLogModal('${p.name}')" title="Logs">${ICONS.logs} <span class="btn-text">Logs</span></button>
-                            ${p.uploaded ? `
-                                <button class="btn btn-update" onclick="openUpdateModal('${p.name}')" title="Update">${ICONS.update} <span class="btn-text">Update</span></button>
-                                <button class="btn btn-remove" onclick="removeProgram('${p.name}')" title="Remove">${ICONS.remove} <span class="btn-text">Remove</span></button>
-                            ` : ''}
+                            <button class="btn btn-edit" onclick="openEditModal('${p.name}')" title="Edit">${ICONS.edit} <span class="btn-text">Edit</span></button>
+                            <button class="btn btn-remove" onclick="removeProgram('${p.name}')" ${p.status !== 'stopped' ? 'disabled' : ''} title="Remove">${ICONS.remove} <span class="btn-text">Remove</span></button>
                         </div>
                         <div class="action-group">
                             <button class="btn btn-restart" onclick="action('restart', '${p.name}')" ${p.status === 'stopping' || p.status === 'restarting' ? 'disabled' : ''} title="Restart">${ICONS.restart} <span class="btn-text">Restart</span></button>
@@ -692,10 +819,8 @@ def get_html(title: str = "Process Manager") -> str:
                                             `<button class="btn btn-stop" onclick="action('stop', '${p.name}')" ${p.status === 'stopping' ? 'disabled' : ''} title="Stop">${ICONS.stop}</button>`}
                                         <button class="btn btn-restart" onclick="action('restart', '${p.name}')" ${p.status === 'stopping' || p.status === 'restarting' ? 'disabled' : ''} title="Restart">${ICONS.restart}</button>
                                         <button class="btn btn-logs" onclick="openLogModal('${p.name}')" title="Logs">${ICONS.logs}</button>
-                                        ${p.uploaded ? `
-                                            ${p.status === 'stopped' ? `<button class="btn btn-update" onclick="openUpdateModal('${p.name}')" title="Update">${ICONS.update}</button>` : ''}
-                                            ${p.status === 'stopped' ? `<button class="btn btn-remove" onclick="removeProgram('${p.name}')" title="Remove">${ICONS.remove}</button>` : ''}
-                                        ` : ''}
+                                        <button class="btn btn-edit" onclick="openEditModal('${p.name}')" title="Edit">${ICONS.edit}</button>
+                                        <button class="btn btn-remove" onclick="removeProgram('${p.name}')" ${p.status !== 'stopped' ? 'disabled' : ''} title="Remove">${ICONS.remove}</button>
                                     </div>
                                 </td>
                             </tr>
@@ -840,6 +965,12 @@ def get_html(title: str = "Process Manager") -> str:
                 if (document.getElementById('uploadModal').classList.contains('active')) {
                     closeUploadModal();
                 }
+                if (document.getElementById('editModal').classList.contains('active')) {
+                    closeEditModal();
+                }
+                if (document.getElementById('addModal').classList.contains('active')) {
+                    closeAddModal();
+                }
             }
         });
 
@@ -941,6 +1072,209 @@ def get_html(title: str = "Process Manager") -> str:
                 }
             } catch (error) {
                 alert(`Error: ${error.message}`);
+            }
+        }
+
+        // Edit Modal Functions
+        let editingProgram = null;
+
+        async function openEditModal(name) {
+            editingProgram = name;
+
+            // Always fetch fresh data
+            const res = await fetch('/api/status');
+            const programs = await res.json();
+            const program = programs.find(p => p.name === name);
+
+            if (!program) {
+                alert('Program not found');
+                return;
+            }
+
+            // Populate form
+            document.getElementById('editOriginalName').value = name;
+            document.getElementById('editProgramName').value = program.name;
+            document.getElementById('editScript').value = program.script;
+            document.getElementById('editComment').value = program.comment || '';
+            document.getElementById('editVenv').value = program.venv || '';
+            document.getElementById('editCwd').value = program.cwd || '';
+            document.getElementById('editArgs').value = program.args ? program.args.join(' ') : '';
+            document.getElementById('editEnvironment').value = program.environment ? program.environment.join('\\n') : '';
+            document.getElementById('editEnabled').checked = program.enabled;
+            document.getElementById('editZipFile').value = '';  // Clear any previous file selection
+
+            // Show ZIP upload field only for uploaded programs
+            document.getElementById('editZipGroup').style.display = program.uploaded ? 'block' : 'none';
+
+            document.getElementById('editModalTitle').textContent = `Edit: ${name}`;
+            document.getElementById('editStatus').style.display = 'none';
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('active');
+            editingProgram = null;
+        }
+
+        async function handleEdit(event) {
+            event.preventDefault();
+            const btn = document.getElementById('editBtn');
+            const statusDiv = document.getElementById('editStatus');
+
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+            statusDiv.style.display = 'none';
+
+            const originalName = document.getElementById('editOriginalName').value;
+            const argsStr = document.getElementById('editArgs').value.trim();
+            const envStr = document.getElementById('editEnvironment').value.trim();
+            const zipFile = document.getElementById('editZipFile').files[0];
+
+            try {
+                // Save the configuration FIRST (before ZIP upload changes status)
+                statusDiv.style.display = 'block';
+                statusDiv.className = 'upload-status';
+                statusDiv.style.background = 'rgba(33, 150, 243, 0.2)';
+                statusDiv.style.color = '#2196f3';
+                statusDiv.style.border = '1px solid rgba(33, 150, 243, 0.3)';
+                statusDiv.textContent = 'Saving configuration...';
+
+                const updates = {
+                    new_name: document.getElementById('editProgramName').value,
+                    script: document.getElementById('editScript').value,
+                    comment: document.getElementById('editComment').value || null,
+                    venv: document.getElementById('editVenv').value || null,
+                    cwd: document.getElementById('editCwd').value || null,
+                    args: argsStr ? argsStr.split(/\\s+/) : null,
+                    environment: envStr ? envStr.split('\\n').map(l => l.trim()).filter(l => l) : null,
+                    enabled: document.getElementById('editEnabled').checked
+                };
+
+                const response = await fetch(`/api/edit/${encodeURIComponent(originalName)}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(updates)
+                });
+
+                const result = await response.json();
+
+                if (!result.success) {
+                    statusDiv.className = 'upload-status error';
+                    statusDiv.textContent = result.message;
+                    btn.disabled = false;
+                    btn.textContent = 'Save Changes';
+                    return;
+                }
+
+                // Use the new name for subsequent operations if renamed
+                const programName = updates.new_name || originalName;
+
+                // If ZIP file is provided, upload it after config is saved
+                if (zipFile) {
+                    statusDiv.textContent = 'Configuration saved. Uploading ZIP file...';
+
+                    const formData = new FormData();
+                    formData.append('zipfile', zipFile);
+
+                    const updateResponse = await fetch(`/api/update/${encodeURIComponent(programName)}`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const updateResult = await updateResponse.json();
+
+                    if (!updateResult.success) {
+                        statusDiv.className = 'upload-status error';
+                        statusDiv.textContent = `Config saved but ZIP upload failed: ${updateResult.message}`;
+                        btn.disabled = false;
+                        btn.textContent = 'Save Changes';
+                        return;
+                    }
+
+                    statusDiv.className = 'upload-status success';
+                    statusDiv.textContent = 'Configuration saved and code updated!';
+                } else {
+                    statusDiv.className = 'upload-status success';
+                    statusDiv.textContent = result.message;
+                }
+
+                setTimeout(() => {
+                    closeEditModal();
+                    fetchStatus();
+                }, 1500);
+            } catch (error) {
+                statusDiv.style.display = 'block';
+                statusDiv.className = 'upload-status error';
+                statusDiv.textContent = `Error: ${error.message}`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save Changes';
+            }
+        }
+
+        // Add Modal Functions
+        function openAddModal() {
+            document.getElementById('addForm').reset();
+            document.getElementById('addEnabled').checked = true;
+            document.getElementById('addStatus').style.display = 'none';
+            document.getElementById('addModal').classList.add('active');
+        }
+
+        function closeAddModal() {
+            document.getElementById('addModal').classList.remove('active');
+        }
+
+        async function handleAdd(event) {
+            event.preventDefault();
+            const btn = document.getElementById('addBtn');
+            const statusDiv = document.getElementById('addStatus');
+
+            btn.disabled = true;
+            btn.textContent = 'Adding...';
+            statusDiv.style.display = 'none';
+
+            const argsStr = document.getElementById('addArgs').value.trim();
+            const envStr = document.getElementById('addEnvironment').value.trim();
+
+            const data = {
+                name: document.getElementById('addProgramName').value,
+                script: document.getElementById('addScript').value,
+                comment: document.getElementById('addComment').value || null,
+                venv: document.getElementById('addVenv').value || null,
+                cwd: document.getElementById('addCwd').value || null,
+                args: argsStr ? argsStr.split(/\\s+/) : null,
+                environment: envStr ? envStr.split('\\n').map(l => l.trim()).filter(l => l) : null,
+                enabled: document.getElementById('addEnabled').checked
+            };
+
+            try {
+                const response = await fetch('/api/add', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                statusDiv.style.display = 'block';
+                if (result.success) {
+                    statusDiv.className = 'upload-status success';
+                    statusDiv.textContent = result.message;
+                    setTimeout(() => {
+                        closeAddModal();
+                        fetchStatus();
+                    }, 1500);
+                } else {
+                    statusDiv.className = 'upload-status error';
+                    statusDiv.textContent = result.message;
+                }
+            } catch (error) {
+                statusDiv.style.display = 'block';
+                statusDiv.className = 'upload-status error';
+                statusDiv.textContent = `Error: ${error.message}`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Add Program';
             }
         }
 

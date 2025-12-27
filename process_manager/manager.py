@@ -44,7 +44,7 @@ class ProcessManager:
     def __init__(self, config_path: str = "process_manager.yaml"):
         self.base_dir = Path(__file__).parent.parent.resolve()
         self.config_path = self.base_dir / config_path
-        self.uploaded_config_path = self.base_dir / "uploaded_programs.yaml"
+        self.programs_config_path = self.base_dir / "programs.yaml"
         self.pid_file = self.base_dir / "process_manager.pids.json"
         self.uploaded_dir = self.base_dir / UPLOADED_PROGRAMS_DIR
         self.log_dir = self.base_dir / "log"
@@ -52,7 +52,6 @@ class ProcessManager:
         self.running = True
         self.lock = threading.Lock()
         self.config = {}
-        self.uploaded_config = {}
         self.venv_python = None  # Will be set in load_config()
         self.global_cwd = None  # Will be set in load_config()
 
@@ -77,7 +76,7 @@ class ProcessManager:
                 return {"success": False, "message": f"Failed to reload configuration: {str(e)}"}
 
     def load_config(self):
-        # Load main configuration
+        # Load main configuration (settings only)
         with open(self.config_path) as f:
             self.config = yaml.safe_load(f)
 
@@ -117,20 +116,26 @@ class ProcessManager:
         else:
             self.global_cwd = None
 
-        # Load uploaded programs configuration (may not exist yet)
-        if self.uploaded_config_path.exists():
-            with open(self.uploaded_config_path) as f:
-                self.uploaded_config = yaml.safe_load(f) or {}
+        # Migrate from old config format if programs.yaml doesn't exist
+        if not self.programs_config_path.exists():
+            self._migrate_to_programs_yaml()
+
+        # Load programs from programs.yaml
+        if self.programs_config_path.exists():
+            with open(self.programs_config_path) as f:
+                programs_config = yaml.safe_load(f) or {}
         else:
-            self.uploaded_config = {}
+            programs_config = {"programs": []}
 
-        # Load manual programs from main config
-        for prog in self.config.get("programs", []):
+        # Load all programs from programs.yaml
+        for prog in programs_config.get("programs", []):
             name = prog["name"]
+            program_uploaded = prog.get("uploaded", False)
             program_venv = prog.get("venv")
             program_cwd = prog.get("cwd")
             program_args = prog.get("args")
             program_environment = prog.get("environment")
+            program_comment = prog.get("comment")
             # Ensure args is a list
             if program_args is not None and not isinstance(program_args, list):
                 program_args = [str(program_args)]
@@ -142,69 +147,65 @@ class ProcessManager:
                     name=name,
                     script=prog["script"],
                     enabled=prog.get("enabled", True),
-                    uploaded=False,  # Manual programs are not uploaded
+                    uploaded=program_uploaded,
+                    comment=program_comment,
                     venv=program_venv,
                     cwd=program_cwd,
                     args=program_args,
                     environment=program_environment
                 )
             else:
+                # Update existing process (on reload)
                 self.processes[name].script = prog["script"]
                 self.processes[name].enabled = prog.get("enabled", True)
-                self.processes[name].uploaded = False
+                self.processes[name].uploaded = program_uploaded
+                self.processes[name].comment = program_comment
                 self.processes[name].venv = program_venv
                 self.processes[name].cwd = program_cwd
                 self.processes[name].args = program_args
                 self.processes[name].environment = program_environment
 
-        # Load uploaded programs from uploaded_programs.yaml
-        for prog in self.uploaded_config.get("programs", []):
-            name = prog["name"]
-            program_venv = prog.get("venv")
-            program_cwd = prog.get("cwd")
-            program_args = prog.get("args")
-            program_environment = prog.get("environment")
-            # Ensure args is a list
-            if program_args is not None and not isinstance(program_args, list):
-                program_args = [str(program_args)]
-            # Ensure environment is a list
-            if program_environment is not None and not isinstance(program_environment, list):
-                program_environment = [str(program_environment)]
-            if name not in self.processes:
-                self.processes[name] = ProcessInfo(
-                    name=name,
-                    script=prog["script"],
-                    enabled=prog.get("enabled", True),
-                    uploaded=True,  # All programs from uploaded config are uploaded
-                    venv=program_venv,
-                    cwd=program_cwd,
-                    args=program_args,
-                    environment=program_environment
-                )
-            else:
-                # Update existing process (shouldn't happen, but handle it)
-                self.processes[name].script = prog["script"]
-                self.processes[name].enabled = prog.get("enabled", True)
-                self.processes[name].uploaded = True
-                self.processes[name].venv = program_venv
-                self.processes[name].cwd = program_cwd
-                self.processes[name].args = program_args
-                self.processes[name].environment = program_environment
+    def _migrate_to_programs_yaml(self):
+        """One-time migration from old config format to new programs.yaml."""
+        programs = []
 
-    def save_config(self):
-        """Save manual (non-uploaded) programs to main config file."""
+        # Collect from process_manager.yaml (old format had programs there)
+        if "programs" in self.config:
+            programs.extend(self.config.get("programs", []))
+
+        # Collect from uploaded_programs.yaml (old uploaded programs file)
+        old_uploaded_path = self.base_dir / "uploaded_programs.yaml"
+        if old_uploaded_path.exists():
+            try:
+                with open(old_uploaded_path) as f:
+                    uploaded = yaml.safe_load(f) or {}
+                programs.extend(uploaded.get("programs", []))
+            except Exception as e:
+                print(f"Warning: Failed to read uploaded_programs.yaml during migration: {e}")
+
+        if programs:
+            # Write to programs.yaml
+            try:
+                with open(self.programs_config_path, "w") as f:
+                    yaml.dump({"programs": programs}, f, default_flow_style=False, sort_keys=False)
+                print(f"Migrated {len(programs)} programs to programs.yaml")
+            except Exception as e:
+                print(f"Warning: Failed to write programs.yaml during migration: {e}")
+
+    def save_programs(self):
+        """Save all programs to programs.yaml."""
         programs_config = []
         with self.lock:
             for info in self.processes.values():
-                # Skip uploaded programs - they go in uploaded_programs.yaml
+                prog = {
+                    "name": info.name,
+                    "script": info.script,
+                    "enabled": info.enabled,
+                }
                 if info.uploaded:
-                    continue
-
-                prog = {
-                    "name": info.name,
-                    "script": info.script,
-                    "enabled": info.enabled,
-                }
+                    prog["uploaded"] = info.uploaded
+                if info.comment:
+                    prog["comment"] = info.comment
                 if info.venv:
                     prog["venv"] = info.venv
                 if info.cwd:
@@ -215,46 +216,11 @@ class ProcessManager:
                     prog["environment"] = info.environment
                 programs_config.append(prog)
 
-        self.config["programs"] = programs_config
-
         try:
-            with open(self.config_path, "w") as f:
-                yaml.dump(self.config, f, default_flow_style=False, sort_keys=False)
+            with open(self.programs_config_path, "w") as f:
+                yaml.dump({"programs": programs_config}, f, default_flow_style=False, sort_keys=False)
         except Exception as e:
-            print(f"Failed to save config: {e}")
-            raise
-
-    def save_uploaded_config(self):
-        """Save uploaded programs to uploaded_programs.yaml."""
-        programs_config = []
-        with self.lock:
-            for info in self.processes.values():
-                # Only save uploaded programs
-                if not info.uploaded:
-                    continue
-
-                prog = {
-                    "name": info.name,
-                    "script": info.script,
-                    "enabled": info.enabled,
-                }
-                if info.venv:
-                    prog["venv"] = info.venv
-                if info.cwd:
-                    prog["cwd"] = info.cwd
-                if info.args:
-                    prog["args"] = info.args
-                if info.environment:
-                    prog["environment"] = info.environment
-                programs_config.append(prog)
-
-        self.uploaded_config["programs"] = programs_config
-
-        try:
-            with open(self.uploaded_config_path, "w") as f:
-                yaml.dump(self.uploaded_config, f, default_flow_style=False, sort_keys=False)
-        except Exception as e:
-            print(f"Failed to save uploaded config: {e}")
+            print(f"Failed to save programs: {e}")
             raise
 
     def save_pids(self):
@@ -604,6 +570,11 @@ class ProcessManager:
                     "script": info.script,
                     "enabled": info.enabled,
                     "uploaded": info.uploaded,
+                    "comment": info.comment,
+                    "venv": info.venv,
+                    "cwd": info.cwd,
+                    "args": info.args,
+                    "environment": info.environment,
                     "status": info.status,
                     "pid": pid,
                     "uptime": uptime,
@@ -736,6 +707,102 @@ class ProcessManager:
                 return True
         return False
 
+    def edit_program(self, name: str, updates: dict) -> dict:
+        """Edit an existing program's configuration.
+
+        Args:
+            name: Current program name
+            updates: Dict with optional keys: new_name, script, enabled, comment,
+                     venv, cwd, args, environment
+
+        Returns: {"success": bool, "message": str}
+        """
+        with self.lock:
+            if name not in self.processes:
+                return {"success": False, "message": f"Program '{name}' not found."}
+
+            info = self.processes[name]
+
+            # Check if stopped (required for most edits)
+            if info.status != "stopped":
+                # Allow only enabled toggle while running
+                if set(updates.keys()) != {"enabled"}:
+                    return {"success": False, "message": f"Program '{name}' must be stopped to edit configuration."}
+
+            # Check for name collision if renaming
+            new_name = updates.get("new_name")
+            if new_name and new_name != name:
+                if new_name in self.processes:
+                    return {"success": False, "message": f"Program '{new_name}' already exists."}
+
+            # Apply updates
+            if "script" in updates:
+                info.script = updates["script"]
+            if "enabled" in updates:
+                info.enabled = updates["enabled"]
+            if "comment" in updates:
+                info.comment = updates["comment"] or None
+            if "venv" in updates:
+                info.venv = updates["venv"] or None
+            if "cwd" in updates:
+                info.cwd = updates["cwd"] or None
+            if "args" in updates:
+                info.args = updates["args"] or None
+            if "environment" in updates:
+                info.environment = updates["environment"] or None
+
+            # Handle rename
+            if new_name and new_name != name:
+                info.name = new_name
+                del self.processes[name]
+                self.processes[new_name] = info
+
+                # Rename log file if exists
+                old_log = self.log_dir / f"{self.sanitize_filename(name)}.log"
+                new_log = self.log_dir / f"{self.sanitize_filename(new_name)}.log"
+                if old_log.exists():
+                    old_log.rename(new_log)
+                # Rename backup log too
+                old_log_backup = self.log_dir / f"{self.sanitize_filename(name)}.log.1"
+                new_log_backup = self.log_dir / f"{self.sanitize_filename(new_name)}.log.1"
+                if old_log_backup.exists():
+                    old_log_backup.rename(new_log_backup)
+
+        # Save to disk
+        self.save_programs()
+
+        final_name = new_name if new_name and new_name != name else name
+        return {"success": True, "message": f"Program '{final_name}' updated successfully."}
+
+    def add_program(self, name: str, script: str, enabled: bool = True,
+                    comment: str = None, venv: str = None, cwd: str = None,
+                    args: list = None, environment: list = None) -> dict:
+        """Add a new program to the configuration (without ZIP file).
+
+        Returns: {"success": bool, "message": str}
+        """
+        with self.lock:
+            if name in self.processes:
+                return {"success": False, "message": f"Program '{name}' already exists."}
+
+            self.processes[name] = ProcessInfo(
+                name=name,
+                script=script,
+                enabled=enabled,
+                comment=comment,
+                venv=venv,
+                cwd=cwd,
+                args=args,
+                environment=environment
+            )
+
+        self.save_programs()
+
+        if enabled:
+            self.start_program(name)
+
+        return {"success": True, "message": f"Program '{name}' added successfully."}
+
     def get_log_content(self, name: str, lines: int = 100, offset: int = 0) -> dict:
         """Get log content for a process using tail-like behavior."""
         if name not in self.processes:
@@ -769,7 +836,7 @@ class ProcessManager:
         except Exception as e:
             return {"error": str(e), "content": None}
 
-    def upload_program(self, name: str, zip_data: bytes, script: str, enabled: bool = True, args: list = None, environment: list = None) -> dict:
+    def upload_program(self, name: str, zip_data: bytes, script: str, enabled: bool = True, args: list = None, environment: list = None, comment: str = None) -> dict:
         """Upload a new program from ZIP file.
 
         Returns: {"success": bool, "message": str}
@@ -805,6 +872,7 @@ class ProcessManager:
                     script=script,
                     enabled=enabled,
                     uploaded=True,
+                    comment=comment,
                     venv=str(program_dir / ".venv"),
                     cwd=str(program_dir),
                     args=args,
@@ -812,7 +880,7 @@ class ProcessManager:
                     status="installing"
                 )
             # Save config outside lock to avoid deadlock
-            self.save_uploaded_config()
+            self.save_programs()
 
             # Run installation in background thread
             threading.Thread(
@@ -888,7 +956,7 @@ class ProcessManager:
                 log.write(f"\n[ERROR] Installation exception: {str(e)}\n")
 
     def update_program(self, name: str, zip_data: bytes) -> dict:
-        """Update an existing uploaded program.
+        """Update an existing program's code.
 
         Returns: {"success": bool, "message": str}
         """
@@ -898,10 +966,6 @@ class ProcessManager:
                 return {"success": False, "message": f"Program '{name}' not found."}
 
             info = self.processes[name]
-
-            # Check if it's an uploaded program
-            if not info.uploaded:
-                return {"success": False, "message": f"Program '{name}' is not an uploaded program. Cannot update."}
 
             # Check if it's stopped
             if info.status != "stopped":
@@ -1030,7 +1094,7 @@ class ProcessManager:
                     self.processes[name].status = "error"
 
     def remove_program(self, name: str) -> dict:
-        """Remove an uploaded program.
+        """Remove a program.
 
         Returns: {"success": bool, "message": str}
         """
@@ -1041,10 +1105,6 @@ class ProcessManager:
 
             info = self.processes[name]
 
-            # Check if it's an uploaded program
-            if not info.uploaded:
-                return {"success": False, "message": f"Program '{name}' is not an uploaded program. Cannot remove."}
-
             # Check if it's stopped
             if info.status != "stopped":
                 return {"success": False, "message": f"Program '{name}' must be stopped before removal."}
@@ -1053,16 +1113,23 @@ class ProcessManager:
             del self.processes[name]
 
         # Save config outside lock to avoid deadlock
-        self.save_uploaded_config()
+        self.save_programs()
 
-        # Remove program directory
+        # Remove program directory if it exists in uploaded_programs/
         program_dir = self.uploaded_dir / self.sanitize_filename(name)
         try:
             if program_dir.exists():
                 shutil.rmtree(program_dir)
+            # Remove log file
+            log_file = self.log_dir / f"{self.sanitize_filename(name)}.log"
+            if log_file.exists():
+                log_file.unlink()
+            log_backup = self.log_dir / f"{self.sanitize_filename(name)}.log.1"
+            if log_backup.exists():
+                log_backup.unlink()
             return {"success": True, "message": f"Program '{name}' removed successfully."}
         except Exception as e:
-            return {"success": False, "message": f"Failed to remove directory: {str(e)}"}
+            return {"success": False, "message": f"Failed to remove files: {str(e)}"}
 
     def _extract_zip(self, zip_data: bytes, target_dir: Path) -> dict:
         """Extract ZIP file to target directory with security checks.
