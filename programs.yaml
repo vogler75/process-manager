@@ -2,21 +2,21 @@ programs:
 - name: Test Program 1
   script: test_program_1.py
   enabled: false
-  comment: Hello World 2
+  comment: Hello World 3
   args:
   - --port
-  - '2000'
+  - '3'
   environment:
-  - TEST=Hallo2
+  - TEST=Hallo 3
 - name: Upload 1
   script: app.py
   enabled: false
   uploaded: true
-  comment: Test 1
+  comment: Test 2
   venv: /Users/vogler/Workspace/python-process-manager/uploaded_programs/Upload_1/.venv
   cwd: /Users/vogler/Workspace/python-process-manager/uploaded_programs/Upload_1
   args:
   - --port
-  - '80001'
+  - '2'
   environment:
-  - TEST=Hallo1
+  - TEST=Test 2

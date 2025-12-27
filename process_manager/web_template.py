@@ -285,8 +285,6 @@ def get_html(title: str = "Process Manager") -> str:
             .process-footer .btn { padding: 4px; width: 32px; height: 32px; }
         }
         
-        .btn-upload-header { background: linear-gradient(135deg, #00bcd4, #0097a7); color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 600; transition: all 0.2s ease; }
-        .btn-upload-header:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 188, 212, 0.4); }
         .btn-reload-config { background: linear-gradient(135deg, #ff9800, #f57c00); color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 600; transition: all 0.2s ease; }
         .btn-reload-config:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4); }
         .btn-reload-config:disabled { background: #444; cursor: not-allowed; transform: none; box-shadow: none; }
@@ -447,8 +445,7 @@ def get_html(title: str = "Process Manager") -> str:
             <div style="display: flex; gap: 15px; align-items: center;">
                 <button class="btn btn-view-toggle" onclick="toggleView()" id="btnViewToggle">Table View</button>
                 <button class="btn btn-reload-config" onclick="reloadConfig()" id="btnReloadConfig">Reload Configuration</button>
-                <button class="btn btn-add" onclick="openAddModal()">+ Add Program</button>
-                <button class="btn btn-upload-header" onclick="openUploadModal()">+ Upload Program</button>
+                <button class="btn btn-add" onclick="openAddModal()">+ New Program</button>
                 <div class="header-status" id="headerStatus">
                     <span class="dot"></span>
                     <span>Loading...</span>
@@ -477,57 +474,6 @@ def get_html(title: str = "Process Manager") -> str:
             </div>
             <div class="modal-body">
                 <pre class="log-content" id="logContent"></pre>
-            </div>
-        </div>
-    </div>
-
-    <!-- Upload Program Modal -->
-    <div id="uploadModal" class="modal-overlay">
-        <div class="modal upload-modal">
-            <div class="modal-header">
-                <h2 id="uploadModalTitle">Upload Program</h2>
-                <button class="modal-close" onclick="closeUploadModal()">Close</button>
-            </div>
-            <div class="upload-form-body">
-                <form id="uploadForm" onsubmit="handleUpload(event)">
-                    <div class="form-group">
-                        <label for="programName">Program Name *</label>
-                        <input type="text" id="programName" name="name" required placeholder="My Application">
-                        <div class="hint">Unique name for this program</div>
-                    </div>
-                    <div class="form-group">
-                        <label for="scriptFile">Entry Script *</label>
-                        <input type="text" id="scriptFile" name="script" required placeholder="main.py">
-                        <div class="hint">Python script to execute (e.g., main.py, app.py)</div>
-                    </div>
-                    <div class="form-group">
-                        <label for="zipFile">ZIP File *</label>
-                        <input type="file" id="zipFile" name="zipfile" accept=".zip" required>
-                        <div class="hint">ZIP archive containing your Python program (max 50MB)</div>
-                    </div>
-                    <div class="form-group">
-                        <label for="programComment">Comment (optional)</label>
-                        <textarea id="programComment" name="comment" rows="2" placeholder="Description or notes about this program"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="programArgs">Arguments (optional)</label>
-                        <input type="text" id="programArgs" name="args" placeholder="--port 8000 --debug">
-                        <div class="hint">Space-separated command-line arguments</div>
-                    </div>
-                    <div class="form-group">
-                        <label for="programEnvironment">Environment Variables (optional)</label>
-                        <textarea id="programEnvironment" name="environment" rows="4" placeholder="PYTHONUNBUFFERED=TRUE&#10;DTU_HOST=192.168.1.132&#10;UPDATE_EVERY=45"></textarea>
-                        <div class="hint">One environment variable per line in KEY=VALUE format</div>
-                    </div>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="programEnabled" name="enabled" checked>
-                            Start automatically after upload
-                        </label>
-                    </div>
-                    <div class="upload-status" id="uploadStatus"></div>
-                    <button type="submit" class="btn-submit" id="uploadBtn">Upload Program</button>
-                </form>
             </div>
         </div>
     </div>
@@ -591,11 +537,11 @@ def get_html(title: str = "Process Manager") -> str:
         </div>
     </div>
 
-    <!-- Add Program Modal -->
+    <!-- New Program Modal -->
     <div id="addModal" class="modal-overlay">
         <div class="modal upload-modal">
             <div class="modal-header">
-                <h2>Add Program</h2>
+                <h2>New Program</h2>
                 <button class="modal-close" onclick="closeAddModal()">Close</button>
             </div>
             <div class="upload-form-body">
@@ -611,18 +557,23 @@ def get_html(title: str = "Process Manager") -> str:
                         <div class="hint">Python script to execute</div>
                     </div>
                     <div class="form-group">
+                        <label for="addZipFile">ZIP File (optional)</label>
+                        <input type="file" id="addZipFile" name="zipfile" accept=".zip">
+                        <div class="hint">If provided, extracts files and creates isolated venv with requirements.txt</div>
+                    </div>
+                    <div class="form-group">
                         <label for="addComment">Comment (optional)</label>
                         <textarea id="addComment" name="comment" rows="2" placeholder="Description or notes about this program"></textarea>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="addVenvGroup">
                         <label for="addVenv">Virtual Environment (optional)</label>
                         <input type="text" id="addVenv" name="venv" placeholder=".venv or /path/to/venv">
-                        <div class="hint">Leave empty to use global venv</div>
+                        <div class="hint">Leave empty to use global venv (ignored if ZIP provided)</div>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="addCwdGroup">
                         <label for="addCwd">Working Directory (optional)</label>
                         <input type="text" id="addCwd" name="cwd" placeholder="/path/to/directory">
-                        <div class="hint">Leave empty to use global cwd</div>
+                        <div class="hint">Leave empty to use global cwd (ignored if ZIP provided)</div>
                     </div>
                     <div class="form-group">
                         <label for="addArgs">Arguments (optional)</label>
@@ -639,7 +590,7 @@ def get_html(title: str = "Process Manager") -> str:
                         </label>
                     </div>
                     <div class="upload-status" id="addStatus"></div>
-                    <button type="submit" class="btn-submit" id="addBtn">Add Program</button>
+                    <button type="submit" class="btn-submit" id="addBtn">Create Program</button>
                 </form>
             </div>
         </div>
@@ -962,9 +913,6 @@ def get_html(title: str = "Process Manager") -> str:
                 if (document.getElementById('logModal').classList.contains('active')) {
                     closeLogModal();
                 }
-                if (document.getElementById('uploadModal').classList.contains('active')) {
-                    closeUploadModal();
-                }
                 if (document.getElementById('editModal').classList.contains('active')) {
                     closeEditModal();
                 }
@@ -973,84 +921,6 @@ def get_html(title: str = "Process Manager") -> str:
                 }
             }
         });
-
-        // Upload Modal Functions
-        let isUpdateMode = false;
-        let updateProgramName = null;
-
-        function openUploadModal() {
-            isUpdateMode = false;
-            updateProgramName = null;
-            document.getElementById('uploadModalTitle').textContent = 'Upload Program';
-            document.getElementById('uploadForm').reset();
-            document.getElementById('programName').disabled = false;
-            document.getElementById('scriptFile').disabled = false;
-            document.getElementById('uploadBtn').textContent = 'Upload Program';
-            document.getElementById('uploadStatus').style.display = 'none';
-            document.getElementById('uploadModal').classList.add('active');
-        }
-
-        function openUpdateModal(name) {
-            isUpdateMode = true;
-            updateProgramName = name;
-            document.getElementById('uploadModalTitle').textContent = `Update Program: ${name}`;
-            document.getElementById('uploadForm').reset();
-            document.getElementById('programName').value = name;
-            document.getElementById('programName').disabled = true;
-            document.getElementById('scriptFile').disabled = true;
-            document.getElementById('uploadBtn').textContent = 'Update Program';
-            document.getElementById('uploadStatus').style.display = 'none';
-            document.getElementById('uploadModal').classList.add('active');
-        }
-
-        function closeUploadModal() {
-            document.getElementById('uploadModal').classList.remove('active');
-            isUpdateMode = false;
-            updateProgramName = null;
-        }
-
-        async function handleUpload(event) {
-            event.preventDefault();
-            const form = event.target;
-            const formData = new FormData(form);
-            const uploadBtn = document.getElementById('uploadBtn');
-            const statusDiv = document.getElementById('uploadStatus');
-
-            uploadBtn.disabled = true;
-            uploadBtn.textContent = isUpdateMode ? 'Updating...' : 'Uploading...';
-            statusDiv.style.display = 'none';
-
-            try {
-                const url = isUpdateMode ? `/api/update/${encodeURIComponent(updateProgramName)}` : '/api/upload';
-                const response = await fetch(url, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-
-                statusDiv.style.display = 'block';
-                if (result.success) {
-                    statusDiv.className = 'upload-status success';
-                    statusDiv.textContent = result.message + ' The program is now installing in the background. Check logs to see progress.';
-                    form.reset();
-                    setTimeout(() => {
-                        closeUploadModal();
-                        fetchStatus();
-                    }, 2000);
-                } else {
-                    statusDiv.className = 'upload-status error';
-                    statusDiv.textContent = result.message;
-                }
-            } catch (error) {
-                statusDiv.style.display = 'block';
-                statusDiv.className = 'upload-status error';
-                statusDiv.textContent = `Error: ${error.message}`;
-            } finally {
-                uploadBtn.disabled = false;
-                uploadBtn.textContent = isUpdateMode ? 'Update Program' : 'Upload Program';
-            }
-        }
 
         async function removeProgram(name) {
             if (!confirm(`Are you sure you want to remove "${name}"? This will delete all files and cannot be undone.`)) {
@@ -1212,9 +1082,10 @@ def get_html(title: str = "Process Manager") -> str:
             }
         }
 
-        // Add Modal Functions
+        // New Program Modal Functions
         function openAddModal() {
             document.getElementById('addForm').reset();
+            document.getElementById('addZipFile').value = '';  // Ensure file input is cleared
             document.getElementById('addEnabled').checked = true;
             document.getElementById('addStatus').style.display = 'none';
             document.getElementById('addModal').classList.add('active');
@@ -1230,36 +1101,62 @@ def get_html(title: str = "Process Manager") -> str:
             const statusDiv = document.getElementById('addStatus');
 
             btn.disabled = true;
-            btn.textContent = 'Adding...';
             statusDiv.style.display = 'none';
 
+            const zipFile = document.getElementById('addZipFile').files[0];
             const argsStr = document.getElementById('addArgs').value.trim();
             const envStr = document.getElementById('addEnvironment').value.trim();
 
-            const data = {
-                name: document.getElementById('addProgramName').value,
-                script: document.getElementById('addScript').value,
-                comment: document.getElementById('addComment').value || null,
-                venv: document.getElementById('addVenv').value || null,
-                cwd: document.getElementById('addCwd').value || null,
-                args: argsStr ? argsStr.split(/\\s+/) : null,
-                environment: envStr ? envStr.split('\\n').map(l => l.trim()).filter(l => l) : null,
-                enabled: document.getElementById('addEnabled').checked
-            };
-
             try {
-                const response = await fetch('/api/add', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data)
-                });
+                let response, result;
 
-                const result = await response.json();
+                if (zipFile) {
+                    // Use upload API with FormData for ZIP files
+                    btn.textContent = 'Uploading...';
+                    const formData = new FormData();
+                    formData.append('name', document.getElementById('addProgramName').value);
+                    formData.append('script', document.getElementById('addScript').value);
+                    formData.append('zipfile', zipFile);
+                    formData.append('comment', document.getElementById('addComment').value || '');
+                    formData.append('args', argsStr);
+                    formData.append('environment', envStr);
+                    if (document.getElementById('addEnabled').checked) {
+                        formData.append('enabled', 'on');
+                    }
+
+                    response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                } else {
+                    // Use add API with JSON for manual programs
+                    btn.textContent = 'Creating...';
+                    const data = {
+                        name: document.getElementById('addProgramName').value,
+                        script: document.getElementById('addScript').value,
+                        comment: document.getElementById('addComment').value || null,
+                        venv: document.getElementById('addVenv').value || null,
+                        cwd: document.getElementById('addCwd').value || null,
+                        args: argsStr ? argsStr.split(/\\s+/) : null,
+                        environment: envStr ? envStr.split('\\n').map(l => l.trim()).filter(l => l) : null,
+                        enabled: document.getElementById('addEnabled').checked
+                    };
+
+                    response = await fetch('/api/add', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(data)
+                    });
+                }
+
+                result = await response.json();
 
                 statusDiv.style.display = 'block';
                 if (result.success) {
                     statusDiv.className = 'upload-status success';
-                    statusDiv.textContent = result.message;
+                    statusDiv.textContent = zipFile
+                        ? result.message + ' Installing in background. Check logs for progress.'
+                        : result.message;
                     setTimeout(() => {
                         closeAddModal();
                         fetchStatus();
@@ -1274,7 +1171,7 @@ def get_html(title: str = "Process Manager") -> str:
                 statusDiv.textContent = `Error: ${error.message}`;
             } finally {
                 btn.disabled = false;
-                btn.textContent = 'Add Program';
+                btn.textContent = 'Create Program';
             }
         }
 
