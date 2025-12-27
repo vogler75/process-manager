@@ -540,28 +540,38 @@ def get_html(title: str = "Process Manager") -> str:
                 return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"></svg>`;
             }
 
-            const padding = 2;
-            const maxVal = Math.max(...data, 10); // At least 10% scale for visibility
+            const padding = 1;
+            const maxVal = Math.max(...data, 10);
 
-            // Display up to 300 points (5 minutes)
-            const displayData = data.slice(-300);
+            // Decimate data to match display width for a cleaner "finer" line
+            let displayData = data.slice(-300);
+            if (displayData.length > width) {
+                const sampled = [];
+                const bucketSize = displayData.length / width;
+                for (let i = 0; i < width; i++) {
+                    const start = Math.floor(i * bucketSize);
+                    const end = Math.floor((i + 1) * bucketSize);
+                    const slice = displayData.slice(start, Math.max(start + 1, end));
+                    sampled.push(Math.max(...slice)); // Use max for visibility of spikes
+                }
+                displayData = sampled;
+            }
+
             const stepX = width / Math.max(displayData.length - 1, 1);
-
-            // Generate path points
             const points = displayData.map((val, i) => {
                 const x = i * stepX;
                 const y = height - padding - ((val / maxVal) * (height - padding * 2));
                 return `${x},${y}`;
-            }).join(' ');
+            });
 
-            // Color based on average CPU usage
-            const avg = displayData.reduce((a, b) => a + b, 0) / displayData.length;
-            let color = '#4caf50'; // Green
-            if (avg > 50) color = '#ff9800'; // Orange
-            if (avg > 80) color = '#f44336'; // Red
+            const polylinePoints = points.join(' ');
+            const areaPoints = `${points[0].split(',')[0]},${height} ${polylinePoints} ${points[points.length-1].split(',')[0]},${height}`;
 
-            return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
-                <polyline fill="none" stroke="${color}" stroke-width="2" points="${points}"/>
+            const color = getCPUColor(data);
+
+            return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" style="display: block; width: 100%; height: 100%;">
+                <polyline fill="${color}" fill-opacity="0.15" points="${areaPoints}"/>
+                <polyline fill="none" stroke="${color}" stroke-width="1.2" stroke-linejoin="round" points="${polylinePoints}"/>
             </svg>`;
         }
 
