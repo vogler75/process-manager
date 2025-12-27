@@ -854,6 +854,11 @@ def get_html(title: str = "Process Manager") -> str:
         }
 
         async function action(type, name) {
+            if (type === 'stop') {
+                if (!confirm(`Are you sure you want to stop "${name}"?`)) return;
+            } else if (type === 'restart') {
+                if (!confirm(`Are you sure you want to restart "${name}"?`)) return;
+            }
             await fetch(`/api/${type}/${encodeURIComponent(name)}`, { method: 'POST' });
             fetchStatus();
         }

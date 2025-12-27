@@ -720,16 +720,14 @@ class ProcessManager:
                 return {"success": False, "message": f"Program '{name}' not found."}
 
             info = self.processes[name]
-
-            # Check if stopped (required for most edits)
-            if info.status != "stopped":
-                # Allow only enabled toggle while running
-                if set(updates.keys()) != {"enabled"}:
-                    return {"success": False, "message": f"Program '{name}' must be stopped to edit configuration."}
+            is_running = info.status != "stopped"
 
             # Check for name collision if renaming
             new_name = updates.get("new_name")
             if new_name and new_name != name:
+                # Renaming requires the program to be stopped
+                if is_running:
+                    return {"success": False, "message": f"Program '{name}' must be stopped to rename."}
                 if new_name in self.processes:
                     return {"success": False, "message": f"Program '{new_name}' already exists."}
 
@@ -773,6 +771,8 @@ class ProcessManager:
         self.save_programs()
 
         final_name = new_name if new_name and new_name != name else name
+        if is_running:
+            return {"success": True, "message": f"Program '{final_name}' updated. Restart required for changes to take effect."}
         return {"success": True, "message": f"Program '{final_name}' updated successfully."}
 
     def add_program(self, name: str, script: str, prog_type: str = RUNTIME_PYTHON,
