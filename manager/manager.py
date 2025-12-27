@@ -24,7 +24,7 @@ from datetime import datetime
 import json
 import yaml
 
-from .models import ProcessInfo
+from .models import ProcessInfo, RUNTIME_PYTHON, RUNTIME_NODE, SUPPORTED_RUNTIMES
 
 try:
     import psutil
@@ -53,6 +53,7 @@ class ProcessManager:
         self.lock = threading.Lock()
         self.config = {}
         self.venv_python = None  # Will be set in load_config()
+        self.node_path = None  # Will be set in load_config()
         self.global_cwd = None  # Will be set in load_config()
 
         # Create uploaded programs directory if it doesn't exist
@@ -106,6 +107,16 @@ class ProcessManager:
             print(f"Warning: venv not found at {self.venv_python}")
             print(f"         Configure 'venv' in {self.config_path}")
 
+        # Load node path from config (optional, defaults to 'node' in PATH)
+        node_path = self.config.get("node")
+        if node_path:
+            self.node_path = Path(node_path)
+        else:
+            # Use 'node' from PATH
+            self.node_path = shutil.which("node")
+            if self.node_path:
+                self.node_path = Path(self.node_path)
+
         # Load global cwd from config (optional)
         global_cwd = self.config.get("cwd")
         if global_cwd:
@@ -126,6 +137,7 @@ class ProcessManager:
         # Load all programs from progs.yaml
         for prog in programs_config.get("programs", []):
             name = prog["name"]
+            program_type = prog.get("type", RUNTIME_PYTHON)
             program_uploaded = prog.get("uploaded", False)
             program_venv = prog.get("venv")
             program_cwd = prog.get("cwd")
@@ -142,6 +154,7 @@ class ProcessManager:
                 self.processes[name] = ProcessInfo(
                     name=name,
                     script=prog["script"],
+                    type=program_type,
                     enabled=prog.get("enabled", True),
                     uploaded=program_uploaded,
                     comment=program_comment,
@@ -153,6 +166,7 @@ class ProcessManager:
             else:
                 # Update existing process (on reload)
                 self.processes[name].script = prog["script"]
+                self.processes[name].type = program_type
                 self.processes[name].enabled = prog.get("enabled", True)
                 self.processes[name].uploaded = program_uploaded
                 self.processes[name].comment = program_comment
@@ -171,6 +185,8 @@ class ProcessManager:
                     "script": info.script,
                     "enabled": info.enabled,
                 }
+                if info.type != RUNTIME_PYTHON:
+                    prog["type"] = info.type
                 if info.uploaded:
                     prog["uploaded"] = info.uploaded
                 if info.comment:
@@ -378,10 +394,21 @@ class ProcessManager:
             return
 
         log_file = self.log_dir / f"{self.sanitize_filename(info.name)}.log"
-        venv_python = self.get_venv_python(info)
 
-        # Build command with optional arguments
-        cmd = [str(venv_python), "-u", str(script_path)]
+        # Build command based on runtime type
+        if info.type == RUNTIME_NODE:
+            # Node.js program
+            if not self.node_path:
+                print(f"[{info.name}] Node.js not found. Install Node.js or configure 'node' in {self.config_path}")
+                info.status = "error"
+                return
+            cmd = [str(self.node_path), str(script_path)]
+        else:
+            # Python program (default)
+            venv_python = self.get_venv_python(info)
+            cmd = [str(venv_python), "-u", str(script_path)]
+
+        # Add optional arguments
         if info.args:
             cmd.extend([str(arg) for arg in info.args])
 
@@ -412,7 +439,8 @@ class ProcessManager:
             info.pid = info.process.pid
             info.status = "running"
             info.start_time = datetime.now()
-            print(f"[{info.name}] Started with PID {info.process.pid} using {venv_python}")
+            runtime = self.node_path if info.type == RUNTIME_NODE else self.get_venv_python(info)
+            print(f"[{info.name}] Started with PID {info.process.pid} using {runtime}")
             self.save_pids()  # Persist PIDs after starting
         except Exception as e:
             print(f"[{info.name}] Failed to start: {e}")
@@ -537,6 +565,7 @@ class ProcessManager:
                 status.append({
                     "name": info.name,
                     "script": info.script,
+                    "type": info.type,
                     "enabled": info.enabled,
                     "uploaded": info.uploaded,
                     "comment": info.comment,
@@ -707,6 +736,9 @@ class ProcessManager:
             # Apply updates
             if "script" in updates:
                 info.script = updates["script"]
+            if "type" in updates:
+                if updates["type"] in SUPPORTED_RUNTIMES:
+                    info.type = updates["type"]
             if "enabled" in updates:
                 info.enabled = updates["enabled"]
             if "comment" in updates:
@@ -743,9 +775,9 @@ class ProcessManager:
         final_name = new_name if new_name and new_name != name else name
         return {"success": True, "message": f"Program '{final_name}' updated successfully."}
 
-    def add_program(self, name: str, script: str, enabled: bool = True,
-                    comment: str = None, venv: str = None, cwd: str = None,
-                    args: list = None, environment: list = None) -> dict:
+    def add_program(self, name: str, script: str, prog_type: str = RUNTIME_PYTHON,
+                    enabled: bool = True, comment: str = None, venv: str = None,
+                    cwd: str = None, args: list = None, environment: list = None) -> dict:
         """Add a new program to the configuration (without ZIP file).
 
         Returns: {"success": bool, "message": str}
@@ -754,9 +786,13 @@ class ProcessManager:
             if name in self.processes:
                 return {"success": False, "message": f"Program '{name}' already exists."}
 
+            if prog_type not in SUPPORTED_RUNTIMES:
+                prog_type = RUNTIME_PYTHON
+
             self.processes[name] = ProcessInfo(
                 name=name,
                 script=script,
+                type=prog_type,
                 enabled=enabled,
                 comment=comment,
                 venv=venv,
@@ -805,11 +841,14 @@ class ProcessManager:
         except Exception as e:
             return {"error": str(e), "content": None}
 
-    def upload_program(self, name: str, zip_data: bytes, script: str, enabled: bool = True, args: list = None, environment: list = None, comment: str = None) -> dict:
+    def upload_program(self, name: str, zip_data: bytes, script: str, prog_type: str = RUNTIME_PYTHON,
+                       enabled: bool = True, args: list = None, environment: list = None, comment: str = None) -> dict:
         """Upload a new program from ZIP file.
 
         Returns: {"success": bool, "message": str}
         """
+        if prog_type not in SUPPORTED_RUNTIMES:
+            prog_type = RUNTIME_PYTHON
         with self.lock:
             # Check for duplicate name
             if name in self.processes:
@@ -839,10 +878,11 @@ class ProcessManager:
                 self.processes[name] = ProcessInfo(
                     name=name,
                     script=script,
+                    type=prog_type,
                     enabled=enabled,
                     uploaded=True,
                     comment=comment,
-                    venv=str(program_dir / ".venv"),
+                    venv=str(program_dir / ".venv") if prog_type == RUNTIME_PYTHON else None,
                     cwd=str(program_dir),
                     args=args,
                     environment=environment,
@@ -854,7 +894,7 @@ class ProcessManager:
             # Run installation in background thread
             threading.Thread(
                 target=self._install_program_async,
-                args=(name, program_dir, enabled),
+                args=(name, program_dir, prog_type, enabled),
                 daemon=True
             ).start()
 
@@ -864,8 +904,8 @@ class ProcessManager:
             shutil.rmtree(program_dir, ignore_errors=True)
             return {"success": False, "message": f"Upload failed: {str(e)}"}
 
-    def _install_program_async(self, name: str, program_dir: Path, should_start: bool):
-        """Install program (venv + dependencies) in background thread."""
+    def _install_program_async(self, name: str, program_dir: Path, prog_type: str, should_start: bool):
+        """Install program (venv/npm + dependencies) in background thread."""
         log_file = self.log_dir / f"{self.sanitize_filename(name)}.log"
 
         try:
@@ -873,24 +913,29 @@ class ProcessManager:
             with open(log_file, "a") as log:
                 log.write(f"\n{'='*70}\n")
                 log.write(f"Program Upload: {name}\n")
+                log.write(f"Type: {prog_type}\n")
                 log.write(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 log.write(f"Directory: {program_dir}\n")
                 log.write(f"{'='*70}\n\n")
 
-            # Create virtual environment
-            result = self._create_venv(program_dir, log_file)
-            if not result["success"]:
-                with self.lock:
-                    if name in self.processes:
-                        self.processes[name].status = "error"
-                with open(log_file, "a") as log:
-                    log.write(f"\n[FAILED] Installation failed: {result['message']}\n")
-                return
-
-            # Install dependencies if requirements.txt exists
-            requirements_file = program_dir / "requirements.txt"
-            if requirements_file.exists():
-                result = self._install_requirements(program_dir, log_file)
+            if prog_type == RUNTIME_NODE:
+                # Node.js: run npm install if package.json exists
+                package_json = program_dir / "package.json"
+                if package_json.exists():
+                    result = self._install_npm_dependencies(program_dir, log_file)
+                    if not result["success"]:
+                        with self.lock:
+                            if name in self.processes:
+                                self.processes[name].status = "error"
+                        with open(log_file, "a") as log:
+                            log.write(f"\n[FAILED] Installation failed: {result['message']}\n")
+                        return
+                else:
+                    with open(log_file, "a") as log:
+                        log.write(f"No package.json found, skipping npm install.\n\n")
+            else:
+                # Python: create venv and install requirements
+                result = self._create_venv(program_dir, log_file)
                 if not result["success"]:
                     with self.lock:
                         if name in self.processes:
@@ -898,9 +943,21 @@ class ProcessManager:
                     with open(log_file, "a") as log:
                         log.write(f"\n[FAILED] Installation failed: {result['message']}\n")
                     return
-            else:
-                with open(log_file, "a") as log:
-                    log.write(f"No requirements.txt found, skipping dependency installation.\n\n")
+
+                # Install dependencies if requirements.txt exists
+                requirements_file = program_dir / "requirements.txt"
+                if requirements_file.exists():
+                    result = self._install_requirements(program_dir, log_file)
+                    if not result["success"]:
+                        with self.lock:
+                            if name in self.processes:
+                                self.processes[name].status = "error"
+                        with open(log_file, "a") as log:
+                            log.write(f"\n[FAILED] Installation failed: {result['message']}\n")
+                        return
+                else:
+                    with open(log_file, "a") as log:
+                        log.write(f"No requirements.txt found, skipping pip install.\n\n")
 
             # Installation successful
             with open(log_file, "a") as log:
@@ -983,22 +1040,28 @@ class ProcessManager:
                 return result
 
             # Set status to installing
+            prog_type = RUNTIME_PYTHON
             with self.lock:
                 if name in self.processes:
                     self.processes[name].status = "installing"
+                    prog_type = self.processes[name].type
 
-            # Run installation in background (only if requirements.txt exists)
+            # Run installation in background (if dependency file exists)
             requirements_file = program_dir / "requirements.txt"
-            if requirements_file.exists():
+            package_json = program_dir / "package.json"
+            needs_install = (prog_type == RUNTIME_PYTHON and requirements_file.exists()) or \
+                           (prog_type == RUNTIME_NODE and package_json.exists())
+
+            if needs_install:
                 threading.Thread(
                     target=self._update_program_async,
-                    args=(name, program_dir, backup_dir),
+                    args=(name, program_dir, backup_dir, prog_type),
                     daemon=True
                 ).start()
 
                 return {"success": True, "message": f"Program '{name}' is being updated. Check logs for progress."}
             else:
-                # No requirements.txt, update complete
+                # No dependency file, update complete
                 shutil.rmtree(backup_dir, ignore_errors=True)
                 with self.lock:
                     if name in self.processes:
@@ -1012,7 +1075,7 @@ class ProcessManager:
                 shutil.move(str(backup_dir), str(program_dir))
             return {"success": False, "message": f"Update failed: {str(e)}"}
 
-    def _update_program_async(self, name: str, program_dir: Path, backup_dir: Path):
+    def _update_program_async(self, name: str, program_dir: Path, backup_dir: Path, prog_type: str):
         """Update program dependencies in background thread."""
         log_file = self.log_dir / f"{self.sanitize_filename(name)}.log"
 
@@ -1021,11 +1084,16 @@ class ProcessManager:
             with open(log_file, "a") as log:
                 log.write(f"\n{'='*70}\n")
                 log.write(f"Program Update: {name}\n")
+                log.write(f"Type: {prog_type}\n")
                 log.write(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 log.write(f"{'='*70}\n\n")
 
-            # Install dependencies
-            result = self._install_requirements(program_dir, log_file)
+            # Install dependencies based on type
+            if prog_type == RUNTIME_NODE:
+                result = self._install_npm_dependencies(program_dir, log_file)
+            else:
+                result = self._install_requirements(program_dir, log_file)
+
             if not result["success"]:
                 # Restore backup
                 with open(log_file, "a") as log:
@@ -1252,6 +1320,62 @@ class ProcessManager:
                 with open(log_file, "a") as log:
                     log.write(f"\n[ERROR] pip install failed: {str(e)}\n")
             return {"success": False, "message": f"pip install failed: {str(e)}"}
+
+    def _install_npm_dependencies(self, program_dir: Path, log_file: Path = None) -> dict:
+        """Install Node.js dependencies using npm install."""
+        npm_path = shutil.which("npm")
+        if not npm_path:
+            return {"success": False, "message": "npm not found. Install Node.js/npm."}
+
+        try:
+            if log_file:
+                with open(log_file, "a") as log:
+                    log.write(f"{'='*60}\n")
+                    log.write(f"Installing Node.js dependencies...\n")
+                    log.write(f"Command: npm install\n")
+                    log.write(f"{'='*60}\n")
+                    log.flush()
+
+                    result = subprocess.run(
+                        [npm_path, "install"],
+                        stdout=log,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        timeout=300,  # 5 minutes max
+                        cwd=program_dir
+                    )
+            else:
+                result = subprocess.run(
+                    [npm_path, "install"],
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                    cwd=program_dir
+                )
+
+            if result.returncode != 0:
+                msg = "npm install failed (see logs for details)" if log_file else f"npm install failed: {result.stderr}"
+                if log_file:
+                    with open(log_file, "a") as log:
+                        log.write(f"\n[ERROR] npm install failed with code {result.returncode}\n")
+                return {"success": False, "message": msg}
+
+            if log_file:
+                with open(log_file, "a") as log:
+                    log.write(f"\n[SUCCESS] Node.js dependencies installed successfully\n")
+                    log.write(f"{'='*60}\n\n")
+
+            return {"success": True, "message": "npm packages installed."}
+        except subprocess.TimeoutExpired:
+            if log_file:
+                with open(log_file, "a") as log:
+                    log.write(f"\n[ERROR] npm install timed out after 5 minutes\n")
+            return {"success": False, "message": "npm install timed out (>5 minutes)."}
+        except Exception as e:
+            if log_file:
+                with open(log_file, "a") as log:
+                    log.write(f"\n[ERROR] npm install failed: {str(e)}\n")
+            return {"success": False, "message": f"npm install failed: {str(e)}"}
 
     def shutdown(self):
         """Shutdown the process manager without stopping managed processes."""

@@ -18,14 +18,21 @@ from collections import deque
 CPU_HISTORY_SIZE = 300
 
 
+# Supported runtime types
+RUNTIME_PYTHON = "python"
+RUNTIME_NODE = "node"
+SUPPORTED_RUNTIMES = [RUNTIME_PYTHON, RUNTIME_NODE]
+
+
 @dataclass
 class ProcessInfo:
     name: str
     script: str
+    type: str = RUNTIME_PYTHON  # Runtime type: "python" or "node"
     enabled: bool = True
     uploaded: bool = False  # True if program has upload directory (can update via ZIP)
     comment: str = None  # Optional: user notes/description for this program
-    venv: str = None  # Optional: program-specific venv path
+    venv: str = None  # Optional: program-specific venv path (Python only)
     cwd: str = None  # Optional: working directory for the process
     args: list = None  # Optional: command-line arguments
     environment: list = None  # Optional: environment variables as list of "KEY=VALUE" strings

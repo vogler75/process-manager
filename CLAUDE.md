@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Python Process Manager is a lightweight process manager with an embedded web dashboard. It manages multiple Python programs, provides auto-restart on crashes, and serves a real-time web UI for monitoring and control.
+Process Manager is a lightweight process manager with an embedded web dashboard. It manages multiple Python and Node.js programs, provides auto-restart on crashes, and serves a real-time web UI for monitoring and control.
 
 ## Running the Application
 
@@ -67,12 +67,14 @@ The application uses two configuration files:
 **`manager.yaml`** - Settings only:
 - `web_ui`: host, port, title
 - `venv`: global Python venv (can override per-program)
+- `node`: path to Node.js executable (optional, defaults to PATH)
 - `cwd`: global working directory (can override per-program)
 - `restart`: delay, max_consecutive_failures, failure_reset_seconds
 - `logging`: max_size_mb for log rotation
 
 **`progs.yaml`** - All program definitions:
-- `programs`: list of all programs {name, script, enabled, uploaded, comment, venv, cwd, args, environment}
+- `programs`: list of all programs {name, script, type, enabled, uploaded, comment, venv, cwd, args, environment}
+- `type`: "python" (default) or "node" for Node.js programs
 - Managed via web UI (Add, Edit, Remove)
 - The `uploaded` field marks programs that have upload directories (can update via ZIP)
 
@@ -82,9 +84,10 @@ The application uses two configuration files:
 - `progs.yaml` - All program definitions (created on first run)
 - `uploaded_programs/` - Directory containing uploaded program files
   - `{program_name}/` - Each uploaded program gets its own directory
-    - `.venv/` - Isolated virtual environment
-    - `*.py` - Program source files
-    - `requirements.txt` - Dependencies (optional)
+    - `.venv/` - Isolated virtual environment (Python only)
+    - `node_modules/` - npm packages (Node.js only)
+    - `*.py` or `*.js` - Program source files
+    - `requirements.txt` or `package.json` - Dependencies (optional)
 - `log/{program_name}.log` - Process output logs
 - `log/{program_name}.log.1` - Rotated log files
 

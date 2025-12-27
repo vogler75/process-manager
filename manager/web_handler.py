@@ -176,6 +176,7 @@ class WebHandler(BaseHTTPRequestHandler):
             # Extract fields
             name = fields.get('name')
             script = fields.get('script')
+            prog_type = fields.get('type', 'python')  # 'python' or 'node'
             comment = fields.get('comment', '').strip() or None
             # Checkbox only sends value when checked, nothing when unchecked
             enabled = 'enabled' in fields
@@ -203,7 +204,7 @@ class WebHandler(BaseHTTPRequestHandler):
                 return
 
             # Upload program
-            result = self.manager.upload_program(name, zip_data, script, enabled, args, environment, comment)
+            result = self.manager.upload_program(name, zip_data, script, prog_type, enabled, args, environment, comment)
 
             self.send_response(200 if result["success"] else 400)
             self.send_header("Content-type", "application/json")
@@ -303,6 +304,7 @@ class WebHandler(BaseHTTPRequestHandler):
             result = self.manager.add_program(
                 name=name,
                 script=script,
+                prog_type=data.get("type", "python"),
                 enabled=data.get("enabled", True),
                 comment=data.get("comment"),
                 venv=data.get("venv"),

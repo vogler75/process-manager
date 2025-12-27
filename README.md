@@ -1,12 +1,13 @@
-# Python Process Manager
+# Process Manager
 
-A lightweight, self-contained process manager for Python applications with a beautiful web UI. Monitor, control, and view logs of multiple Python programs from a single dashboard.
+A lightweight, self-contained process manager for Python and Node.js applications with a beautiful web UI. Monitor, control, and view logs of multiple programs from a single dashboard.
 
 ## Features
 
 - **Web-based Dashboard** - Modern, responsive UI with real-time status updates
-- **Program Upload** - Upload Python programs as ZIP files directly from the web UI
-- **Background Installation** - Automatic venv creation and dependency installation with live logs
+- **Multi-Runtime Support** - Manage both Python and Node.js programs
+- **Program Upload** - Upload programs as ZIP files directly from the web UI
+- **Background Installation** - Automatic venv/npm setup and dependency installation with live logs
 - **Process Monitoring** - Automatic restart on failures with configurable retry limits
 - **CPU Monitoring** - Real-time CPU usage tracking with sparkline charts (requires psutil)
 - **Log Management** - Automatic log rotation with built-in log viewer
@@ -62,6 +63,9 @@ web_ui:
 # Python Virtual Environment
 venv: ".venv"     # Path to venv (relative or absolute)
 
+# Node.js executable (optional, defaults to 'node' in PATH)
+# node: "/usr/local/bin/node"
+
 # Working Directory (optional, can override per-program)
 # cwd: "/path/to/scripts"
 
@@ -82,21 +86,25 @@ Programs are defined in a separate file and can be managed via the web UI:
 
 ```yaml
 programs:
-  - name: "My Application"
+  # Python program example
+  - name: "My Python App"
     script: my_app.py
+    type: python           # Optional, defaults to "python"
     enabled: true
     # comment: "Description of this program"  # Optional
-    # venv: ".venv"  # Optional: program-specific venv
+    # venv: ".venv"  # Optional: program-specific venv (Python only)
     # cwd: "/path/to/workdir"  # Optional: working directory
     # args: ["--port", "8080"]  # Optional: command-line arguments
     # environment:  # Optional: environment variables
     #   - PYTHONUNBUFFERED=TRUE
     #   - API_KEY=your-key-here
 
-  - name: "Background Worker"
-    script: worker.py
+  # Node.js program example
+  - name: "My Node App"
+    script: server.js
+    type: node             # Required for Node.js programs
     enabled: true
-    args: ["--queue", "default"]
+    args: ["--port", "3000"]
 ```
 
 ### Configuration Options
@@ -106,11 +114,20 @@ programs:
 - `port` - HTTP port for the web interface
 - `title` - Custom title displayed in the dashboard
 
-#### Virtual Environment (`venv`)
-- **Global**: Set at top level, applies to all programs (default: `.venv`)
+#### Runtime Type (`type`)
+- **Python** (default): Uses Python venv, installs from `requirements.txt`
+- **Node.js**: Uses `node` executable, installs from `package.json` with npm
+- Set per-program in `progs.yaml` using `type: python` or `type: node`
+
+#### Virtual Environment (`venv`) - Python only
+- **Global**: Set at top level, applies to all Python programs (default: `.venv`)
 - **Per-program**: Override in program config for specific programs
 - Path can be relative (to config file) or absolute
 - Priority: **program venv > global venv**
+
+#### Node.js Executable (`node`)
+- Set path in `manager.yaml` if node is not in PATH
+- Defaults to system `node` command
 
 #### Working Directory (`cwd`)
 - **Global**: Set at top level, applies to all programs
@@ -404,13 +421,20 @@ Process IDs are saved to `manager.pids.json`. When the manager restarts:
 │   ├── manager.py
 │   ├── web_handler.py
 │   └── web_template.py
+├── test/                       # Test programs
+│   ├── test_program_1.py       # Python heartbeat test
+│   ├── test_program_2.py       # Python CPU load test
+│   ├── test_program_3.py       # Python CPU load test
+│   ├── test_node_server.js     # Node.js HTTP server test
+│   └── test_flask_app/         # Flask app test
 ├── manager.yaml                # Settings configuration (web UI, restart, logging, venv)
 ├── progs.yaml                  # All program definitions (auto-managed)
 ├── requirements.txt            # Python dependencies
 ├── manager.pids.json           # Saved process states (auto-generated)
 ├── uploaded_programs/          # Uploaded program files (auto-generated)
 │   └── {Program_Name}/
-│       ├── .venv/              # Program-specific virtual environment
+│       ├── .venv/              # Program-specific virtual environment (Python)
+│       ├── node_modules/       # Dependencies (Node.js)
 │       ├── main.py
 │       ├── requirements.txt
 │       └── ...

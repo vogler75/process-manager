@@ -498,13 +498,20 @@ def get_html(title: str = "Process Manager") -> str:
                         <input type="text" id="editScript" name="script" required>
                     </div>
                     <div class="form-group">
+                        <label for="editType">Runtime Type</label>
+                        <select id="editType" name="type">
+                            <option value="python">Python</option>
+                            <option value="node">Node.js</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label for="editComment">Comment (optional)</label>
                         <textarea id="editComment" name="comment" rows="2" placeholder="Description or notes about this program"></textarea>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="editVenvGroup">
                         <label for="editVenv">Virtual Environment (optional)</label>
                         <input type="text" id="editVenv" name="venv" placeholder=".venv or /path/to/venv">
-                        <div class="hint">Leave empty to use global venv</div>
+                        <div class="hint">Leave empty to use global venv (Python only)</div>
                     </div>
                     <div class="form-group">
                         <label for="editCwd">Working Directory (optional)</label>
@@ -554,12 +561,20 @@ def get_html(title: str = "Process Manager") -> str:
                     <div class="form-group">
                         <label for="addScript">Entry Script *</label>
                         <input type="text" id="addScript" name="script" required placeholder="main.py or /path/to/script.py">
-                        <div class="hint">Python script to execute</div>
+                        <div class="hint" id="addScriptHint">Script to execute</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="addType">Runtime Type *</label>
+                        <select id="addType" name="type" onchange="updateAddFormHints()">
+                            <option value="python" selected>Python</option>
+                            <option value="node">Node.js</option>
+                        </select>
+                        <div class="hint">Python uses venv, Node.js uses npm</div>
                     </div>
                     <div class="form-group">
                         <label for="addZipFile">ZIP File (optional)</label>
                         <input type="file" id="addZipFile" name="zipfile" accept=".zip">
-                        <div class="hint">If provided, extracts files and creates isolated venv with requirements.txt</div>
+                        <div class="hint" id="addZipHint">If provided, extracts files and installs dependencies</div>
                     </div>
                     <div class="form-group">
                         <label for="addComment">Comment (optional)</label>
@@ -568,7 +583,7 @@ def get_html(title: str = "Process Manager") -> str:
                     <div class="form-group" id="addVenvGroup">
                         <label for="addVenv">Virtual Environment (optional)</label>
                         <input type="text" id="addVenv" name="venv" placeholder=".venv or /path/to/venv">
-                        <div class="hint">Leave empty to use global venv (ignored if ZIP provided)</div>
+                        <div class="hint">Leave empty to use global venv (Python only, ignored if ZIP provided)</div>
                     </div>
                     <div class="form-group" id="addCwdGroup">
                         <label for="addCwd">Working Directory (optional)</label>
@@ -965,6 +980,7 @@ def get_html(title: str = "Process Manager") -> str:
             document.getElementById('editOriginalName').value = name;
             document.getElementById('editProgramName').value = program.name;
             document.getElementById('editScript').value = program.script;
+            document.getElementById('editType').value = program.type || 'python';
             document.getElementById('editComment').value = program.comment || '';
             document.getElementById('editVenv').value = program.venv || '';
             document.getElementById('editCwd').value = program.cwd || '';
@@ -975,6 +991,8 @@ def get_html(title: str = "Process Manager") -> str:
 
             // Show ZIP upload field only for uploaded programs
             document.getElementById('editZipGroup').style.display = program.uploaded ? 'block' : 'none';
+            // Show venv field only for Python programs
+            document.getElementById('editVenvGroup').style.display = (program.type || 'python') === 'python' ? 'block' : 'none';
 
             document.getElementById('editModalTitle').textContent = `Edit: ${name}`;
             document.getElementById('editStatus').style.display = 'none';
@@ -1012,6 +1030,7 @@ def get_html(title: str = "Process Manager") -> str:
                 const updates = {
                     new_name: document.getElementById('editProgramName').value,
                     script: document.getElementById('editScript').value,
+                    type: document.getElementById('editType').value,
                     comment: document.getElementById('editComment').value || null,
                     venv: document.getElementById('editVenv').value || null,
                     cwd: document.getElementById('editCwd').value || null,
@@ -1086,13 +1105,30 @@ def get_html(title: str = "Process Manager") -> str:
         function openAddModal() {
             document.getElementById('addForm').reset();
             document.getElementById('addZipFile').value = '';  // Ensure file input is cleared
+            document.getElementById('addType').value = 'python';  // Reset type to Python
             document.getElementById('addEnabled').checked = true;
             document.getElementById('addStatus').style.display = 'none';
+            updateAddFormHints();  // Update hints based on type
             document.getElementById('addModal').classList.add('active');
         }
 
         function closeAddModal() {
             document.getElementById('addModal').classList.remove('active');
+        }
+
+        function updateAddFormHints() {
+            const type = document.getElementById('addType').value;
+            const isPython = type === 'python';
+            // Update script hint
+            document.getElementById('addScriptHint').textContent = isPython
+                ? 'Python script to execute (e.g., main.py)'
+                : 'JavaScript file to execute (e.g., server.js, index.js)';
+            // Update ZIP hint
+            document.getElementById('addZipHint').textContent = isPython
+                ? 'If provided, extracts files and creates isolated venv with requirements.txt'
+                : 'If provided, extracts files and runs npm install with package.json';
+            // Show/hide venv field (only for Python without ZIP)
+            document.getElementById('addVenvGroup').style.display = isPython ? 'block' : 'none';
         }
 
         async function handleAdd(event) {
@@ -1110,12 +1146,15 @@ def get_html(title: str = "Process Manager") -> str:
             try {
                 let response, result;
 
+                const progType = document.getElementById('addType').value;
+
                 if (zipFile) {
                     // Use upload API with FormData for ZIP files
                     btn.textContent = 'Uploading...';
                     const formData = new FormData();
                     formData.append('name', document.getElementById('addProgramName').value);
                     formData.append('script', document.getElementById('addScript').value);
+                    formData.append('type', progType);
                     formData.append('zipfile', zipFile);
                     formData.append('comment', document.getElementById('addComment').value || '');
                     formData.append('args', argsStr);
@@ -1134,6 +1173,7 @@ def get_html(title: str = "Process Manager") -> str:
                     const data = {
                         name: document.getElementById('addProgramName').value,
                         script: document.getElementById('addScript').value,
+                        type: progType,
                         comment: document.getElementById('addComment').value || null,
                         venv: document.getElementById('addVenv').value || null,
                         cwd: document.getElementById('addCwd').value || null,

@@ -1,22 +1,23 @@
 programs:
-- name: Test Program 1
-  script: test_program_1.py
-  enabled: false
-  comment: Hello World 3
-  args:
-  - --port
-  - '3'
-  environment:
-  - TEST=Hallo 3
-- name: Upload 1
-  script: app.py
-  enabled: false
-  uploaded: true
-  comment: Test 2
-  venv: /Users/vogler/Workspace/python-process-manager/uploaded_programs/Upload_1/.venv
-  cwd: /Users/vogler/Workspace/python-process-manager/uploaded_programs/Upload_1
-  args:
-  - --port
-  - '2'
-  environment:
-  - TEST=Test 2
+  # Python test program - simple heartbeat
+  - name: Test Program 1
+    script: test/test_program_1.py
+    type: python
+    enabled: false
+    comment: Simple Python heartbeat program
+
+  # Python test program - CPU load simulation
+  - name: Test Program 2
+    script: test/test_program_2.py
+    type: python
+    enabled: false
+    comment: Python program simulating 50% CPU usage
+
+  # Node.js test program - simple HTTP server
+  - name: Test Node Server
+    script: test/test_node_server.js
+    type: node
+    enabled: false
+    comment: Simple Node.js HTTP server on port 3001
+    environment:
+      - PORT=3001
